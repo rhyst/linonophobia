@@ -14,3 +14,13 @@ function getMidpoint(node1, node2) {
 function getAngleFromHorizontal(node1, node2) {
     return Math.atan2(node2.position.y - node1.position.y, node2.position.x - node1.position.x)
 }
+
+function getForce(node1, node2) {
+    var stringLength = getLength(node1, node2);
+    var lengthDifference = stringLength - nominalStringLength;
+    var angleFromHorizontal = getAngleFromHorizontal(node1, node2);
+    var ySpringForce = Math.sin(angleFromHorizontal) * lengthDifference * springConstant;
+    var xSpringForce = Math.cos(angleFromHorizontal) * lengthDifference * springConstant;
+    var totalSpringForce = Math.sqrt((ySpringForce*ySpringForce)+(xSpringForce+xSpringForce));
+    return {total: totalSpringForce, x: xSpringForce, y: ySpringForce}
+}

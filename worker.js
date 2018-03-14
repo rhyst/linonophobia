@@ -4,6 +4,7 @@ importScripts('helper.js')
 var running = true;
 var nodes = [];
 var lastTime = new Date();
+var trueSimulationSpeed = 0;
 
 onmessage = function(e) {
     if (e.data === 'init') {
@@ -14,7 +15,9 @@ onmessage = function(e) {
     } else if (e.data === 'pause') {
         running = false;
     } else if (e.data === 'send') {
-        postMessage(nodes)
+        postMessage({nodes: nodes, trueSimulationSpeed: trueSimulationSpeed})
+    } else if (e.data[0] === 'load') {
+        nodes = JSON.parse(atob(e.data[1]))
     }
 }
 
@@ -92,15 +95,30 @@ function init() {
 
 function doPhysics() {
     var delta = 0;
-    lastTime = new Date();
-    setTimeout(physics, 0)
+    lastTime = self.performance.now();
+    setTimeout(physics, 0);
 }
 
 function physics() {
-    //var newTime = new Date();
-    //console.log(newTime - lastTime);
-    //lastTime = newTime;
+    var simSpeedQuantity = 0;
+    var simulationSpeedSum = 0;
     for (var j = 0; j < 100; j++) {
+        var newTime = self.performance.now()
+        var actualElapsedMilliseconds = (newTime - lastTime);
+        var actualElapsedTime = actualElapsedMilliseconds / 1000
+        var elapsedMilliseconds = actualElapsedMilliseconds*simulationSpeed;
+        if (elapsedMilliseconds > maxStep) {
+            elapsedTime = maxStep / 1000;
+            //console.warn('Max step exceeded, simulation speed may not be correct.')
+        } else {
+            elapsedTime = elapsedMilliseconds / 1000;
+        }
+        var actualSimulationSpeed = elapsedTime/actualElapsedTime;
+        if (!isNaN(actualSimulationSpeed)) {
+            simSpeedQuantity += 1
+            simulationSpeedSum += actualSimulationSpeed;
+        }
+        lastTime = newTime;
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i]
             if (!node.fixed) {
@@ -139,17 +157,18 @@ function physics() {
                 node.force.x = xForce;
 
                 // Alter velocity dv = a*dt = (f/m)*dt = f*dt
-                node.velocity.y = node.velocity.y + (yForce * tick / 1000);
-                node.velocity.x = node.velocity.x + (xForce * tick / 1000);
+                node.velocity.y = node.velocity.y + (yForce * elapsedTime);
+                node.velocity.x = node.velocity.x + (xForce * elapsedTime);
 
                 // Alter position
-                var newY = node.position.y + (node.velocity.y * tick / 1000);
-                var newX = node.position.x + (node.velocity.y * tick / 1000);
-                node.position.y = node.position.y + (node.velocity.y * tick / 1000);
-                node.position.x = node.position.x + (node.velocity.x * tick / 1000);
+                var newY = node.position.y + (node.velocity.y * elapsedTime);
+                var newX = node.position.x + (node.velocity.y * elapsedTime);
+                node.position.y = node.position.y + (node.velocity.y * elapsedTime);
+                node.position.x = node.position.x + (node.velocity.x * elapsedTime);
             }
         }
     }
+    trueSimulationSpeed = simulationSpeedSum / simSpeedQuantity;
     if (running) {
         setTimeout(physics, 0)
     }
