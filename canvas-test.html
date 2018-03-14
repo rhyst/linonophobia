@@ -2,7 +2,6 @@
 
 <head>
 <script src='helper.js'></script>
-<script src='shims.js'></script>
 <script src='config.js'></script>
 </head>
 
@@ -73,30 +72,46 @@
         }
 
         function draw() {
+            ctx.strokeStyle = 'rgb(0,0,0)'
             ctx.clearRect(0, 0, c.width, c.height);
             ctx.beginPath();
             ctx.moveTo(10, 50);
             ctx.lineTo(10, 50 + (10 * metre));
             ctx.fillText("10m", 11, 50 + (10 * metre / 2))
+            ctx.stroke()
             drawn = [];
             function drawLine(node, connectedNodeID) {
+                ctx.beginPath();
                 ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
                 if (showIDs) {
                     ctx.fillText(node.id, node.position.x + 1, node.position.y)
                 }
+                ctx.stroke()
                 if (drawn.indexOf(connectedNodeID.toString() + node.id.toString()) < 0) {
+                    ctx.beginPath();
                     var connectedNode = getNode(connectedNodeID, nodes);
                     //var midpoint = getMidpoint(node, connectedNode);
                     //ctx.fillText("x: " + node.force.x.toFixed(3) + " y: " + node.force.y.toFixed(3) ,midpoint.x,midpoint.y);
                     ctx.moveTo(connectedNode.position.x, connectedNode.position.y);
                     ctx.lineTo(node.position.x, node.position.y);
                     drawn.push(node.id.toString() + connectedNode.id.toString())
+                    var force = getForce(node, connectedNode);
+                    if (force.total >= dangerForceMin && force.total < dangerForceMax) {
+                        normForce = (force.total - dangerForceMin) / (dangerForceMax - dangerForceMin);
+                        color = normForce * 255;
+                        ctx.strokeStyle = 'rgb(' + color.toFixed(0) + ', 0, 0)'
+                    } else if (force.total >= dangerForceMax) {
+                        ctx.strokeStyle = 'rgb(255, 0, 0)'
+                    } else {
+                        ctx.strokeStyle = 'rgb(0,0,0)'
+                    }
+                    ctx.stroke();
                 }
             }
             nodes.forEach(function (node) {
                 node.connectedNodes.forEach(drawLine.bind(this, node));
             })
-            ctx.stroke();
+            //ctx.stroke();
         }
         function compute() {
             var connected = false;
@@ -105,7 +120,7 @@
                     connected = true;
                     var connectedNode = getNode(connectedNodeID, nodes);
                     var force = getForce(node, connectedNode)
-                    document.getElementById('result').innerText = force.total;
+                    document.getElementById('result').innerText = force.total.toFixed(3) + "N";
                 }                
             };
             nodes.forEach(function (node) {

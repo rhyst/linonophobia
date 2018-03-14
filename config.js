@@ -7,3 +7,5 @@ var viscousConstant = 0.4;
 var running = true;
 var simulationSpeed = 3; // times real time
 var maxStep = 10;  // milliseconds
+var dangerForceMax = 300;
+var dangerForceMin = 200;
