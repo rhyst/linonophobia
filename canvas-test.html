@@ -1,115 +1,40 @@
 <html>
 
 <head>
-
+<script src='helper.js'></script>
+<script src='config.js'></script>
 </head>
 
 <body>
     <canvas id="canvas" width="400" height="400" style="border:1px solid #000000;">
     </canvas>
     <div id="data">
+        <div><button id="start">Start</button><button id="stop">Stop</button></div>
         <div>From: <input id="from"></input></div>
         <div>To: <input id="to"></input></div>
         <div>Force: <span id="result"></span></div>
     </div>
     <script>
-        function getNode(id, nodes) {
-            return nodes.find(function (node) {
-                return node.id === id;
-            })
-        }
-        function getLength(node1, node2) {
-            var xdiff = Math.abs(node1.position.x - node2.position.x);
-            var ydiff = Math.abs(node1.position.y - node2.position.y);
-            return Math.sqrt((xdiff * xdiff) + (ydiff * ydiff));
-        }
-        function getMidpoint(node1, node2) {
-            return { x: (node1.position.x + node2.position.x) / 2, y: (node1.position.y + node2.position.y) / 2 }
-        }
-        function getAngleFromHorizontal(node1, node2) {
-            return Math.atan2(node2.position.y - node1.position.y, node2.position.x - node1.position.x)
-        }
-
-        // Init
         var c = document.getElementById("canvas");
         var ctx = c.getContext("2d");
         var nodes = [];
-        var tick = 5; //milliseconds
-        var metre = 10; //pixels
-        var numOfNodes = 40;
-        var nominalStringLength = 10;
-        var springConstant = 100;
-        var velocityDampingConstant = 2;
-        var viscousConstant = 0.4;
-        var initPosition = { x: 200, y: 50 }
-        var position = {
-            x: initPosition.x,
-            y: initPosition.y
-        }
-        nodes.push({
-            id: 0,
-            position: {
-                x: position.x,
-                y: position.y
-            },
-            fixed: true,
-            velocity: {
-                x: 0,
-                y: 0
-            },
-            force: {
-                x: 0,
-                y: 0
-            },
-            connectedNodes: [1]
-        })
-        for (var i = 1; i < numOfNodes; i++) {
-            position.x = position.x + nominalStringLength;
-            var connectedNodes = [i - 1];
-            if (i < numOfNodes - 1) connectedNodes.push(i + 1);
-            nodes.push({
-                id: i,
-                position: {
-                    x: position.x,
-                    y: position.y
-                },
-                velocity: {
-                    x: 0,
-                    y: 0
-                },
-                fixed: false,
-                force: {
-                    x: 0,
-                    y: 0
-                },
-                connectedNodes: connectedNodes
-            });
-        }
 
-        var lastNode = getNode(nodes.length - 1, nodes);
-        lastNode.fixed = true
-        lastNode.position.x = 260;
-        lastNode.position.y = 300;
+        var worker = new Worker('worker.js');
+        worker.onmessage = function(data) {
+            //console.log(data.data)
+            nodes = data.data;
+            draw();
+            compute();
+        };
+        worker.postMessage('init');
 
-        nodes.push({
-            id: nodes.length,
-            position: {
-                x: initPosition.x + 20,
-                y: initPosition.y
-            },
-            velocity: {
-                x: 0,
-                y: 0
-            },
-            fixed: true,
-            force: {
-                x: 0,
-                y: 0
-            },
-            connectedNodes: [1]
+        document.getElementById('start').addEventListener('click', function() {
+            worker.postMessage('run')
         })
-        var node1 = getNode(1, nodes);
-        node1.connectedNodes.push(nodes.length - 1)
+
+        document.getElementById('stop').addEventListener('click', function() {
+            worker.postMessage('pause')
+        })
 
         function draw() {
             ctx.clearRect(0, 0, c.width, c.height);
@@ -135,8 +60,6 @@
             })
             ctx.stroke();
         }
-        draw();
-
         function compute() {
             var connected = false;
             function computeNode(node, connectedNodeID) {
@@ -161,78 +84,13 @@
             }
         }
 
-        var delta = 0;
-        var lastTime = new Date();
-        function physics() {
-            // Redraw
-            id = 0;
-            nextNodeExists = !!getNode(id, nodes);
-            while (nextNodeExists) {
-                var node = getNode(id, nodes);
-                if (!node.fixed) {
-                    // Assume mass = 1 for all nodes
-                    // Calc spring forces on node from prev and next nodes
-                    var ySpringForce = 0;
-                    var xSpringForce = 0;
-                    var xVelocityDampingForce = 0;
-                    var yVelocityDampingForce = 0;
-                    node.connectedNodes.forEach(function (connectedNodeID) {
-                        var connectedNode = getNode(connectedNodeID, nodes);
-                        if (connectedNode) {
-                            var stringLength = getLength(connectedNode, node);
-                            if (stringLength > nominalStringLength) {
-                                var lengthDifference = stringLength - nominalStringLength;
-                                var angleFromHorizontal = getAngleFromHorizontal(node, connectedNode);
-                                ySpringForce += Math.sin(angleFromHorizontal) * lengthDifference * springConstant;
-                                xSpringForce += Math.cos(angleFromHorizontal) * lengthDifference * springConstant;
-                            }
-                            xVelocityDampingForce += velocityDampingConstant * (node.velocity.x - connectedNode.velocity.x);
-                            yVelocityDampingForce += velocityDampingConstant * (node.velocity.y - connectedNode.velocity.y);
-                        }
-                    });
-
-                    // Other forces
-                    var yGravForce = 9.8;
-                    var xGravForce = 0;
-                    var yViscousForce = node.velocity.y * viscousConstant;
-                    var xViscousForce = node.velocity.x * viscousConstant;
-
-                    // Total force
-                    var yForce = yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce;
-                    var xForce = xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce;
-
-                    node.force.y = yForce;
-                    node.force.x = xForce;
-
-                    // Alter velocity dv = a*dt = (f/m)*dt = f*dt
-                    node.velocity.y = node.velocity.y + (yForce * tick / 1000);
-                    node.velocity.x = node.velocity.x + (xForce * tick / 1000);
-
-                    // Alter position
-                    var newY = node.position.y + (node.velocity.y * tick / 1000);
-                    var newX = node.position.x + (node.velocity.y * tick / 1000);
-                    node.position.y = node.position.y + (node.velocity.y * tick / 1000);
-                    node.position.x = node.position.x + (node.velocity.x * tick / 1000);
-                }
-                id = id + 1;
-                nextNodeExists = !!getNode(id, nodes);
-            }
-            draw();
+        function frameSyncer(timestamp) {
+            worker.postMessage('send');
             requestAnimationFrame(frameSyncer)
         }
-
-
-        function frameSyncer(timestamp) {
-            delta += timestamp - lastFrameTimeMs;
-            lastFrameTimeMs = timestamp;
-            while (delta >= tick) {
-                physics();
-                delta -= tick;
-            }
-            compute()
-        }
-        lastFrameTimeMs = 0
         requestAnimationFrame(frameSyncer)
+
+        worker.postMessage('run')
     </script>
 </body>
 
