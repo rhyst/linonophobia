@@ -1,3 +1,5 @@
+const config = require('config');
+
 function getNode(id, nodes) {
     return nodes.find(function (node) {
         return node.id === id;
@@ -17,10 +19,18 @@ function getAngleFromHorizontal(node1, node2) {
 
 function getForce(node1, node2) {
     var stringLength = getLength(node1, node2);
-    var lengthDifference = stringLength - nominalStringLength;
+    var lengthDifference = stringLength - config.nominalStringLength;
     var angleFromHorizontal = getAngleFromHorizontal(node1, node2);
-    var ySpringForce = Math.sin(angleFromHorizontal) * lengthDifference * springConstant;
-    var xSpringForce = Math.cos(angleFromHorizontal) * lengthDifference * springConstant;
+    var ySpringForce = Math.sin(angleFromHorizontal) * lengthDifference * config.springConstant;
+    var xSpringForce = Math.cos(angleFromHorizontal) * lengthDifference * config.springConstant;
     var totalSpringForce = Math.sqrt((ySpringForce*ySpringForce)+(xSpringForce+xSpringForce));
     return {total: totalSpringForce, x: xSpringForce, y: ySpringForce}
+}
+
+module.exports = {
+    getAngleFromHorizontal,
+    getForce,
+    getLength,
+    getMidpoint,
+    getNode
 }
