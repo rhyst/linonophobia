@@ -109,13 +109,10 @@ export default class Controls extends Component {
                             role="menu">
                             <div class="dropdown-content">
                                 <div class="dropdown-item">
-                                    <p>
-                                        You can insert
-                                        <strong>
-                                            any type of content
-                                        </strong>{" "}
-                                        within the dropdown menu.
-                                    </p>
+                                    <label class="checkbox">
+                                        <input type="checkbox" onChange={e=>this.props.changeOption('showIDs', e.target.checked)}/>
+                                        Show IDs
+                                    </label>
                                 </div>
                             </div>
                         </div>

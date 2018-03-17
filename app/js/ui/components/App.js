@@ -16,7 +16,10 @@ export default class App extends Component {
             worker,
             nodes: [],
             selectedControl: ControlsEnum.pan,
-            scale: 1
+            scale: 1,
+            options: {
+              showIDs: false
+            }
         };
     }
 
@@ -67,11 +70,17 @@ export default class App extends Component {
 
     }
 
+    changeOption = (key, value) => {
+      let options = this.state.options;
+      options[key] = value;
+      this.setState({options})
+    }
+
     render() {
         return (
             <main>
-                <Canvas nodes={this.state.nodes} worker={this.state.worker} selectedControl={this.state.selectedControl} scale={this.state.scale}/>
-                <Controls selectedControl={this.state.selectedControl} changeControl={this.changeControl} changeScale={this.changeScale} scale={this.state.scale} />
+                <Canvas options={this.state.options} nodes={this.state.nodes} worker={this.state.worker} selectedControl={this.state.selectedControl} scale={this.state.scale}/>
+                <Controls selectedControl={this.state.selectedControl} changeControl={this.changeControl} changeScale={this.changeScale} scale={this.state.scale} options={this.state.options} changeOption={this.changeOption}/>
                 <Stats trueSimulationSpeed={this.state.trueSimulationSpeed} />
             </main>
         );

@@ -278,7 +278,7 @@ export default class Canvas extends Component {
     };
 
     draw = () => {
-        var showIDs = true;
+        var showIDs = this.props.options.showIDs;
         // Clear and reset canvas
         const ctx = this.canvas.getContext("2d");
         let nodes = this.props.nodes;
