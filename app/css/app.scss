@@ -1,0 +1,18 @@
+@import "bulma";
+// Do any overides here
+html, body {
+    overflow: hidden;
+}
+.controls {
+    position: fixed;
+    top:0;
+    left: 0;
+}
+.controls button {
+    margin: 5px;
+}
+.stats {
+    position: fixed;
+    bottom: 0;
+    margin: 5px;
+}

@@ -1,6 +1,6 @@
-const helper = require('helper');
-const config = require('config');
-const Vector = require("vector").Vector;
+const helper = require('js/shared/helper');
+const config = require('js/shared/config');
+const Vector = require("js/shared/vector").Vector;
 
 document.addEventListener("DOMContentLoaded", () => {
     var c = document.getElementById("canvas");
@@ -24,13 +24,13 @@ document.addEventListener("DOMContentLoaded", () => {
         worker.postMessage("run");
     });
 
-    userPause = false;
+    var userPause = false;
     document.getElementById("stop").addEventListener("click", function() {
         userPause = true;
         worker.postMessage("pause");
     });
 
-    showIDs = true;
+    var showIDs = true;
     document.getElementById("show-ids").addEventListener("click", function() {
         showIDs = document.getElementById("show-ids").checked;
     });
@@ -48,6 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     var selectedNode; 
     var mousePosition;
+    var startCoords;
+    var lastCoords = {x:0,y:0};
+    var transformed = {x:0,y:0};
     c.addEventListener('mousedown', (e) => {
         var rect = c.getBoundingClientRect();
         var mouse = {
@@ -55,21 +58,23 @@ document.addEventListener("DOMContentLoaded", () => {
           y: e.clientY - rect.top
         };
         var m = new Vector(mouse.x, mouse.y);
-        var min = 20;
+        var transformedV = new Vector().load(transformed);
+        var min = 5;
         var selected;
         for (var i = 0; i < nodes.length; i++) {
             nodes[i].position = new Vector().load(nodes[i].position);
-            var distance = nodes[i].position.subtract(m).length();
+            var distance = nodes[i].position.subtract(m.subtract(transformedV)).length();
             if (!min || distance < min) {
                 selected = nodes[i];
                 min = distance;
             }
         }
-        mousePosition = m;
+        mousePosition = m.subtract(transformedV);
         if (selected) {
             selectedNode = selected;
         } else {
-            worker.postMessage(["newnode", {mousePosition}])
+            startCoords = {x: e.pageX - rect.left - lastCoords.x, y: e.pageY - rect.top - lastCoords.y};
+            //worker.postMessage(["newnode", {mousePosition}]);
         }
       }, true);
       c.addEventListener('mousemove', (e) => {
@@ -79,17 +84,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top
             };
-            mousePosition = new Vector(mouse.x, mouse.y);
+            var transformedV = new Vector().load(transformed);
+            mousePosition = new Vector(mouse.x, mouse.y).subtract(transformedV);
+        } else if (startCoords) {
+            var rect = c.getBoundingClientRect();
+            var mouse = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            transformed = {x:  mouse.x - startCoords.x, y: mouse.y - startCoords.y};
+            ctx.setTransform(1, 0, 0, 1, transformed.x, transformed.y);
         }
       }, true);
       c.addEventListener('mouseup', (e) => {
         if (selectedNode) {
-            worker.postMessage(["nomove", {selectedNode}])
+            worker.postMessage(["nomove", {selectedNode}]);
             selectedNode = undefined;
+        } else if (startCoords) {
+            var rect = c.getBoundingClientRect();
+            lastCoords = {x: e.pageX - rect.left - startCoords.x,
+            y: e.pageY - rect.top - startCoords.y};
+            startCoords = undefined;
         }
       }, true);
 
-    simSpeeds = new Array(100);
+    var simSpeeds = new Array(100);
     simSpeeds.fill(config.simulationSpeed);
     function calcSimSpeed() {
         simSpeeds.pop();
@@ -103,13 +122,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function draw() {
         ctx.strokeStyle = "rgb(0,0,0)";
-        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.clearRect(0 - transformed.x, 0 - transformed.y, c.width, c.height);
+        ctx.strokeStyle = "rgb(0,0,0)";
         ctx.beginPath();
         ctx.moveTo(10, 50);
         ctx.lineTo(10, 50 + 10 * config.metre);
         ctx.fillText("10m", 11, 50 + 10 * config.metre / 2);
         ctx.stroke();
-        drawn = [];
+        var drawn = [];
         function drawLine(node, connectedNodeID) {
             ctx.beginPath();
             ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);

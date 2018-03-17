@@ -1,6 +1,7 @@
-const helper = require("helper");
-const config = require("config");
-const Vector = require("vector").Vector;
+const helper = require("js/shared/helper");
+const config = require("js/shared/config");
+const Vector = require("js/shared/vector").Vector;
+const Node = require("js/shared/node").Node;
 
 var running = true;
 var nodes = [];
@@ -24,79 +25,21 @@ onmessage = function(e) {
         node.position = new Vector().load(e.data[1].mousePosition);
         node.velocity = new Vector();
         node.force = new Vector();
-        node.fixed = true
+        node.fixed = true;
     } else if (e.data[0] === "nomove") {
         var node = helper.getNode(e.data[1].selectedNode.id, nodes);
-        node.fixed = false
-    } else if (e.data[0] === "newnode") {
+        node.fixed = false;
+    } else if (e.data[0] === "newanchor") {
         var position = e.data[1].mousePosition;
-        nodes.push(new Node(position.x, position.y, position.z));
+        nodes.push(new Node(position.x, position.y,0,0,0,0,true,[]));
+    } else if (e.data[0] === "deletenode") {
+        var node = e.data[1].node;
+        nodes = nodes.filter(n=>n.id !== node.id).map(n=> {
+            n.connectedNodes = n.connectedNodes.filter(cn => cn !== node.id);
+            return n
+        })
     }
 };
-
-var uniqueid = -1;
-function getID() {
-    uniqueid += 1;
-    return uniqueid;
-}
-
-class Node {
-    constructor(
-        x = 0,
-        y = 0,
-        vx = 0,
-        vy = 0,
-        fx = 0,
-        fy = 0,
-        fixed = false,
-        connectedNodes = [],
-        id
-    ) {
-        this.id = id ? id : getID();
-        this.position = new Vector(x, y);
-        this.velocity = new Vector(vx, vy);
-        this.force = new Vector(fx, fy);
-        this.fixed = fixed;
-        this.connectedNodes = connectedNodes;
-    }
-    getObject() {
-        return {
-            id: this.id,
-            position: this.position,
-            velocity: this.velocity,
-            force: this.force,
-            fixed: this.fixed,
-            connectedNodes: this.connectedNodes
-        };
-    }
-    loadObject(nodeObject = {}) {
-        this.id = nodeObject.id ? nodeObject.id : this.id;
-        this.position = nodeObject.position
-            ? nodeObject.position
-            : this.position;
-        this.velocity = nodeObject.velocity
-            ? nodeObject.velocity
-            : this.velocity;
-        this.force = nodeObject.force ? nodeObject.force : this.force;
-        this.fixed = nodeObject.fixed ? nodeObject.fixed : this.fixed;
-        this.connectedNodes = nodeObject.connectedNodes
-            ? nodeObject.connectedNodes
-            : this.connectedNodes;
-    }
-    copyNode() {
-        return new Node(
-            this.position.x,
-            this.position.y,
-            this.velocity.x,
-            this.velocity.y,
-            this.force.x,
-            this.force.y,
-            this.fixed,
-            this.connectedNodes,
-            this.id
-        );
-    }
-}
 
 function init() {
     var xpos = 200;

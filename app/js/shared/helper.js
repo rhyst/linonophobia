@@ -1,4 +1,4 @@
-const config = require('config');
+const config = require('js/shared/config');
 
 function getNode(id, nodes) {
     return nodes.find(function (node) {
