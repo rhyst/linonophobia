@@ -1,3 +1,5 @@
+const Vector = require('js/shared/vector').Vector;
+
 var uniqueid = -1;
 function getID() {
     uniqueid += 1;

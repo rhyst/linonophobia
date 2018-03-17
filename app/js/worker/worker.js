@@ -25,10 +25,8 @@ onmessage = function(e) {
         node.position = new Vector().load(e.data[1].mousePosition);
         node.velocity = new Vector();
         node.force = new Vector();
-        node.fixed = true;
     } else if (e.data[0] === "nomove") {
-        var node = helper.getNode(e.data[1].selectedNode.id, nodes);
-        node.fixed = false;
+        //var node = helper.getNode(e.data[1].selectedNode.id, nodes);
     } else if (e.data[0] === "newanchor") {
         var position = e.data[1].mousePosition;
         nodes.push(new Node(position.x, position.y,0,0,0,0,true,[]));
@@ -38,6 +36,9 @@ onmessage = function(e) {
             n.connectedNodes = n.connectedNodes.filter(cn => cn !== node.id);
             return n
         })
+    } else if (e.data[0] === "addnodes") {
+        var newNodes = e.data[1].nodes;
+        nodes = nodes.concat(newNodes)
     }
 };
 

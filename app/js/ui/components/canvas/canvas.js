@@ -2,7 +2,8 @@ import { h, Component } from "preact";
 import * as config from "js/shared/config";
 import * as helper from "js/shared/helper";
 import { Vector } from "js/shared/vector";
-import { ControlsEnum } from "js/shared/constants.js";
+import { Node } from "js/shared/node";
+import { ControlsEnum } from "js/shared/constants";
 
 export default class Canvas extends Component {
     constructor(props) {
@@ -10,6 +11,7 @@ export default class Canvas extends Component {
         this.state = {
             mousedown: false,
             selectedNode: null,
+            newNodes: [],
             mousePosition: { x: 0, y: 0 },
             startCoords: { x: 0, y: 0 },
             lastCoords: { x: 0, y: 0 },
@@ -31,7 +33,16 @@ export default class Canvas extends Component {
             ]);
         }
     }
-
+    getUniqueID = () => {
+        let i = 0;
+        let notunique = true;
+        while(notunique) {
+            if (!this.props.nodes.find(n=>n.id === i) && !this.state.newNodes.find(n=>n.id === i)) {
+                return i;
+            }
+            i++;
+        }
+    }
     interact = () => {
         var c = this.canvas;
         var nodes = this.props.nodes;
@@ -103,6 +114,29 @@ export default class Canvas extends Component {
                     this.setState({
                         mousePosition: m.subtract(transformedV)
                     });
+                } else if (this.props.selectedControl === ControlsEnum.rope) {
+                    let node = new Node(mousePosition.x, mousePosition.y,0,0,0,0,false,[],this.getUniqueID())
+                    var nodes = this.props.nodes;
+                    var min = 5;
+                    for (var i = 0; i < nodes.length; i++) {
+                        nodes[i].position = new Vector().load(
+                            nodes[i].position
+                        );
+                        var distance = nodes[i].position
+                            .subtract(mousePosition)
+                            .length();
+                        if (distance < min) {
+                            node.connectedNodes.push(nodes[i].id);
+                            nodes[i].connectedNodes.push(node.id);
+                        }
+                    }
+                    this.setState({
+                        startCoords: {
+                            x: node.position.x,
+                            y: node.position.y
+                        },
+                        newNodes: [node]
+                    });
                 }
                 this.setState({ mousedown: true });
             },
@@ -155,6 +189,27 @@ export default class Canvas extends Component {
                             }
                         }
                     }
+                } else if (this.props.selectedControl === ControlsEnum.rope) {
+                    if (this.state.mousedown) {
+                        let startCoordsV = new Vector().load(this.state.startCoords);
+                        var distance = startCoordsV.subtract(mousePosition).length();
+                        if (distance > config.nominalStringLength) {
+                            let node = new Node(mousePosition.x, mousePosition.y,0,0,0,0,false,[],this.getUniqueID());
+                            let newNodes = this.state.newNodes;
+                            let prevNode = newNodes[newNodes.length - 1];
+                            prevNode.connectedNodes.push(node.id);
+                            node.connectedNodes.push(prevNode.id);
+                            newNodes.push(node);
+                            this.setState({
+                                newNodes,
+                                startCoords: {
+                                    x: mousePosition.x,
+                                    y: mousePosition.y
+                                }
+                            })
+
+                        }
+                    }
                 }
             },
             true
@@ -162,6 +217,14 @@ export default class Canvas extends Component {
         c.addEventListener(
             "mouseup",
             e => {
+                var rect = c.getBoundingClientRect();
+                var mouse = {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+                var transformedV = new Vector().load(this.state.transformed);
+                var m = new Vector(mouse.x, mouse.y);
+                var mousePosition = m.subtract(transformedV).divide(this.props.scale);
                 if (this.props.selectedControl === ControlsEnum.grab) {
                     if (this.state.selectedNode) {
                         this.props.worker.postMessage([
@@ -179,6 +242,27 @@ export default class Canvas extends Component {
                         },
                         startCoords: null
                     });
+                } else if (this.props.selectedControl === ControlsEnum.rope) {
+                    let node = this.state.newNodes[this.state.newNodes.length - 1]
+                    var nodes = this.props.nodes;
+                    var min = 5;
+                    for (var i = 0; i < nodes.length; i++) {
+                        nodes[i].position = new Vector().load(
+                            nodes[i].position
+                        );
+                        var distance = nodes[i].position
+                            .subtract(mousePosition)
+                            .length();
+                        if (distance < min) {
+                            node.connectedNodes.push(nodes[i].id);
+                            nodes[i].connectedNodes.push(node.id);
+                        }
+                    }
+                    this.props.worker.postMessage(["addnodes", {nodes: this.state.newNodes}])
+                    this.setState({
+                        newNodes: [],
+                        nodes: nodes.concat(this.state.newNodes)
+                    })
                 }
                 this.setState({ mousedown: false });
             },
@@ -195,6 +279,7 @@ export default class Canvas extends Component {
 
     draw = () => {
         var showIDs = true;
+        // Clear and reset canvas
         const ctx = this.canvas.getContext("2d");
         let nodes = this.props.nodes;
         ctx.strokeStyle = "rgb(0,0,0)";
@@ -211,6 +296,28 @@ export default class Canvas extends Component {
             this.state.transformed.x,
             this.state.transformed.y
         );
+
+        // Draw grid
+        var gridSize = 10 * config.metre;
+        var offsetx = (this.state.transformed.x / this.props.scale ) % gridSize;
+        var offsety = (this.state.transformed.y / this.props.scale) % gridSize;
+        for (let x = 0 - 2*gridSize; x < (this.canvas.width /  this.props.scale) + gridSize; x = x + gridSize) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#d0d0d0"
+            ctx.moveTo(x - (this.state.transformed.x / this.props.scale ) + offsetx, 0 - gridSize - (this.state.transformed.y / this.props.scale) + offsety);
+            ctx.lineTo(x - (this.state.transformed.x / this.props.scale ) + offsetx,  (this.canvas.height /  this.props.scale) - (this.state.transformed.y / this.props.scale) + offsety + gridSize);
+            ctx.stroke()
+        }
+        for (let y = 0 - 2*gridSize; y < (this.canvas.height /  this.props.scale) + gridSize; y = y + gridSize) {
+            ctx.beginPath();
+            ctx.strokeStyle = "#d0d0d0"
+            ctx.moveTo(0 - gridSize - (this.state.transformed.x / this.props.scale ) + offsetx, y - (this.state.transformed.y / this.props.scale) + offsety);
+            ctx.lineTo((this.canvas.width /  this.props.scale) - (this.state.transformed.x / this.props.scale ) + offsetx + gridSize,y -  (this.state.transformed.y / this.props.scale) + offsety);
+            ctx.stroke()
+        }
+
+        // Draw indicators around cursor if needed
+        ctx.strokeStyle = "rgb(0,0,0)";
         if (this.props.selectedControl === ControlsEnum.erase) {
             ctx.beginPath();
             ctx.arc(
@@ -222,16 +329,25 @@ export default class Canvas extends Component {
             );
             ctx.stroke();
         }
+
+        // Draw scale bar
         ctx.beginPath();
-        ctx.moveTo(10, 50);
-        ctx.lineTo(10, 50 + 10 * config.metre);
-        ctx.fillText("10m", 11, 50 + 10 * config.metre / 2);
+        ctx.moveTo(10, 100);
+        ctx.lineTo(10, 100 + 10 * config.metre);
+        ctx.fillText("10m", 11, 100 + 10 * config.metre / 2);
         ctx.stroke();
+
+        // Draw all lines and nodes
         var drawn = [];
-        function drawLine(node, connectedNodeID) {
+        let drawLine = (node, nodes, connectedNodeID) => {
+            var nodessss = this.props.nodes
+            var newnodesssss = this.state.newNodes
             ctx.beginPath();
-            ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
-            if (showIDs) {
+            if (node.fixed) {
+                ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
+            } else {
+                ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
+            }            if (showIDs) {
                 ctx.fillText(node.id, node.position.x + 1, node.position.y);
             }
             ctx.stroke();
@@ -241,8 +357,6 @@ export default class Canvas extends Component {
             ) {
                 ctx.beginPath();
                 var connectedNode = helper.getNode(connectedNodeID, nodes);
-                //var midpoint = helper.getMidpoint(node, connectedNode);
-                //ctx.fillText("x: " + node.force.x.toFixed(3) + " y: " + node.force.y.toFixed(3) ,midpoint.x,midpoint.y);
                 ctx.moveTo(connectedNode.position.x, connectedNode.position.y);
                 ctx.lineTo(node.position.x, node.position.y);
                 drawn.push(node.id.toString() + connectedNode.id.toString());
@@ -251,10 +365,10 @@ export default class Canvas extends Component {
                     force.total >= config.dangerForceMin &&
                     force.total < config.dangerForceMax
                 ) {
-                    normForce =
+                    var normForce =
                         (force.total - config.dangerForceMin) /
                         (config.dangerForceMax - config.dangerForceMin);
-                    color = normForce * 255;
+                    var color = normForce * 255;
                     ctx.strokeStyle = "rgb(" + color.toFixed(0) + ", 0, 0)";
                 } else if (force.total >= config.dangerForceMax) {
                     ctx.strokeStyle = "rgb(255, 0, 0)";
@@ -264,16 +378,20 @@ export default class Canvas extends Component {
                 ctx.stroke();
             }
         }
-        nodes.forEach(function(node) {
+        nodes.concat(this.state.newNodes).forEach((node) => {
             if (node.connectedNodes.length <= 0) {
                 ctx.beginPath();
-                ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
+                if (node.fixed) {
+                    ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
+                } else {
+                    ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
+                }
                 if (showIDs) {
                     ctx.fillText(node.id, node.position.x + 1, node.position.y);
                 }
                 ctx.stroke();
             }
-            node.connectedNodes.forEach(drawLine.bind(this, node));
+            node.connectedNodes.forEach(drawLine.bind(this, node, nodes.concat(this.state.newNodes)));
         });
     };
     render() {

@@ -3,6 +3,7 @@ import Canvas from "js/ui/components/canvas/canvas";
 import Controls from "js/ui/components/controls/controls";
 import Stats from "js/ui/components/stats/stats";
 import { ControlsEnum } from "js/shared/constants.js"
+import * as config from "js/shared/config";
 
 export default class App extends Component {
     constructor(props) {
