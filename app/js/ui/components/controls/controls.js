@@ -5,7 +5,8 @@ export default class Controls extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            optionsVisible: false
+            optionsVisible: false,
+            paused: false
         };
     }
 
@@ -80,6 +81,17 @@ export default class Controls extends Component {
                         }}>
                         <span class="icon">+</span>
                     </button>
+                    <button
+                        class={`button is-small ${this.props.selectedControl ==
+                            ControlsEnum.pause && "is-primary"}`}
+                        onClick={() => {
+                            this.props.worker.postMessage(this.state.paused ? "run" : "pause")
+                            this.setState({paused: !this.state.paused});
+                        }}>
+                        <span class="icon">
+                            <i class={`fas ${ this.state.paused ? 'fa-play':'fa-pause'}`} />
+                        </span>
+                    </button>
                     <div
                         class={`dropdown ${this.state.optionsVisible &&
                             "is-active"}`}>
@@ -114,6 +126,12 @@ export default class Controls extends Component {
                                         Show IDs
                                     </label>
                                 </div>
+                                <a class="dropdown-item" onClick={this.props.save}>
+                                    Save
+                                </a>
+                                <a class="dropdown-item" onClick={this.props.load}>
+                                    Load
+                                </a>
                             </div>
                         </div>
                     </div>

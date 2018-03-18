@@ -3,5 +3,6 @@ export const ControlsEnum = Object.freeze({
     grab:   "grab",
     anchor: "anchor",
     erase:  "erase",
-    rope:   "rope"
+    rope:   "rope",
+    pause:  "pause",
 });

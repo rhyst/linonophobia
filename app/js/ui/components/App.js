@@ -2,6 +2,8 @@ import { h, Component } from "preact";
 import Canvas from "js/ui/components/canvas/canvas";
 import Controls from "js/ui/components/controls/controls";
 import Stats from "js/ui/components/stats/stats";
+import SaveModal from "js/ui/components/save-modal/save-modal";
+import LoadModal from "js/ui/components/load-modal/load-modal";
 import { ControlsEnum } from "js/shared/constants.js"
 import * as config from "js/shared/config";
 
@@ -19,7 +21,10 @@ export default class App extends Component {
             scale: 1,
             options: {
               showIDs: false
-            }
+            },
+            saveData: null,
+            saveModalVisible: false,
+            loadModalVisible: false
         };
     }
 
@@ -76,12 +81,21 @@ export default class App extends Component {
       this.setState({options})
     }
 
+    save = () => {
+      this.setState({
+        saveData:btoa(JSON.stringify(this.state.nodes)),
+        saveModalVisible: true
+      })
+    }
+
     render() {
         return (
             <main>
                 <Canvas options={this.state.options} nodes={this.state.nodes} worker={this.state.worker} selectedControl={this.state.selectedControl} scale={this.state.scale}/>
-                <Controls selectedControl={this.state.selectedControl} changeControl={this.changeControl} changeScale={this.changeScale} scale={this.state.scale} options={this.state.options} changeOption={this.changeOption}/>
+                <Controls worker={this.state.worker} selectedControl={this.state.selectedControl} changeControl={this.changeControl} changeScale={this.changeScale} scale={this.state.scale} options={this.state.options} changeOption={this.changeOption} save={this.save} load={()=>this.setState({loadModalVisible:true})}/>
                 <Stats trueSimulationSpeed={this.state.trueSimulationSpeed} />
+                <SaveModal visible={this.state.saveModalVisible} saveData={this.state.saveData} close={()=>this.setState({saveModalVisible:false})}/>
+                <LoadModal visible={this.state.loadModalVisible} worker={this.state.worker} close={()=>this.setState({loadModalVisible:false})}/>
             </main>
         );
     }
