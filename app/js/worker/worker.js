@@ -39,6 +39,7 @@ onmessage = function(e) {
     } else if (e.data[0] === "addnodes") {
         var newNodes = e.data[1].nodes;
         nodes = nodes.concat(newNodes)
+        checkConnections();
     }
 };
 
@@ -63,6 +64,25 @@ function init() {
 
     var node1 = helper.getNode(1, nodes);
     node1.connectedNodes.push(yhangnode.id);
+}
+
+function checkConnections() {
+    //TODO: make less bad
+    let connectedNodes = nodes
+    nodes.forEach(n => {
+        n.connectedNodes.forEach(cnID => {
+            let cn = helper.getNode(cnID, nodes);
+            if (cn.connectedNodes.indexOf(n.id) < 0) {
+                connectedNodes = connectedNodes.map(node => {
+                    if (node.id === cnID) {
+                        node.connectedNodes.push(n.id)
+                    }
+                    return node
+                })
+            }
+        })
+    })
+    nodes = connectedNodes
 }
 
 function doPhysics() {
