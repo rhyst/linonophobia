@@ -37,7 +37,7 @@ module.exports = {
             ]
         },
         sass: {
-            mode: "native",
+            mode: "ruby", //"native",
             options: {
                 includePaths: ["node_modules/bulma"]
             }

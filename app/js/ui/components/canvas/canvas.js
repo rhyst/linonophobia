@@ -16,14 +16,23 @@ export default class Canvas extends Component {
             startCoords: new Vector(0, 0),
             transform: {
                 translate: new Vector(0, 0),
-                scale: new Vector(0, 0)
+                scale: new Vector(1, 1)
             },
             hightlightNodeID: null
         };
     }
 
     componentDidMount() {
-        this.interact();
+        this.setupInteractions();
+    }
+
+    componentWillReceiveProps(props) {
+        /*this.setState({
+            transform: {
+                translate: this.state.transform.translate,
+                scale: new Vector(props.scale)
+            }
+        })*/
     }
 
     componentDidUpdate() {
@@ -50,19 +59,26 @@ export default class Canvas extends Component {
         }
     };
 
-    getMouseScreenPosition = mouseevent => {
-        var rect = this.canvas.getBoundingClientRect();
-        var mouse = {
-            x: mouseevent.clientX - rect.left,
-            y: mouseevent.clientY - rect.top
-        };
-        return new Vector(mouse.x, mouse.y);
+    getMouseScreenPosition = event => {
+        let rect = this.canvas.getBoundingClientRect();
+        if (event.type.includes('touch')) {
+            return new Vector(event.touches[0].clientX - rect.left, event.touches[0].clientY - rect.top);
+        } else {
+            return new Vector(event.clientX - rect.left, event.clientY - rect.top);
+        }
     };
 
-    getMouseCanvasPosition = mouseevent => {
-        var m = this.getMouseScreenPosition(mouseevent);
-        return m.subtract(this.state.transform.translate).divide(this.props.scale);
+    getMouseCanvasPosition = event => {
+        var m = this.getMouseScreenPosition(event);
+        return m.subtract(this.state.transform.translate).divide(this.state.transform.scale);
     };
+
+    updateMousePosition = event => {
+        var mousePosition = this.getMouseCanvasPosition(event);
+        this.setState({
+            mousePosition
+        }); 
+    }
 
     getNearestNode = (position, radius, nodes) => {
         let nearestNodes = this.getNearestNodes(position, radius, nodes);
@@ -85,180 +101,23 @@ export default class Canvas extends Component {
             .map(n => n.node);
     };
 
-    interact = () => {
+    setupInteractions = () => {
         var c = this.canvas;
-        var nodes = this.props.nodes;
-        const ctx = this.canvas.getContext("2d");
-        c.addEventListener(
-            "mousedown",
-            e => {
-                var rect = c.getBoundingClientRect();
-                var mousePosition = this.state.mousePosition;
-                this.setState({ mousedown: true });
-                switch (this.props.selectedControl) {
-                    case ControlsEnum.grab:
-                        let hightlightNodeID = this.state.hightlightNodeID;
-                        let selectedNode = this.getNearestNode(mousePosition, 20, this.props.nodes);
-                        this.setState({
-                            selectedNode
-                        });
-                        break;
-                    case ControlsEnum.pan:
-                        this.setState({
-                            startCoords: this.getMouseScreenPosition(e).subtract(this.state.transform.translate)
-                        });
-                        break;
-                    case ControlsEnum.anchor:
-                        this.props.worker.postMessage(["newanchor", { mousePosition }]);
-                        break;
-                    case ControlsEnum.erase:
-                        let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
-                        nearestNodes.forEach(node => {
-                            this.props.worker.postMessage(["deletenode", { node: node }]);
-                        });
-                        break;
-                    case ControlsEnum.rope:
-                        let node = new Node(
-                            mousePosition.x,
-                            mousePosition.y,
-                            0,
-                            0,
-                            0,
-                            0,
-                            false,
-                            [],
-                            this.getUniqueID()
-                        );
-                        let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
-                        if (nearestNode) {
-                            node.connectedNodes.push(nearestNode.id);
-                            nearestNode.connectedNodes.push(node.id);
-                        }
-                        this.setState({
-                            startCoords: new Vector(node.position.x, node.position.y),
-                            newNodes: [node]
-                        });
-                        break;
-                }
-            },
-            true
-        );
-        c.addEventListener(
-            "mousemove",
-            e => {
-                var mouse = this.getMouseScreenPosition(e);
-                var mousePosition = this.getMouseCanvasPosition(e);
-                this.setState({
-                    mousePosition
-                });
-                switch (this.props.selectedControl) {
-                    case ControlsEnum.grab:
-                        // Only uses updated mousePosition
-                        if (!this.state.mousedown) {
-                            let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
-                            this.setState({
-                                hightlightNodeID: nearestNode ? nearestNode.id : null
-                            });
-                        }
-                        break;
-                    case ControlsEnum.pan:
-                        if (this.state.mousedown) {
-                            this.setState({
-                                transform: {
-                                    translate: new Vector(mouse.x, mouse.y).subtract(this.state.startCoords),
-                                    scale: this.state.transform.scale
-                                }
-                            });
-                        }
-                        break;
-                    case ControlsEnum.erase:
-                        if (this.state.mousedown) {
-                            let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
-                            nearestNodes.forEach(node => {
-                                this.props.worker.postMessage(["deletenode", { node: node }]);
-                            });
-                        } else {
-                            let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
-                            this.setState({
-                                hightlightNodeID: nearestNode ? nearestNode.id : null
-                            });
-                        }
-                        break;
-                    case ControlsEnum.rope:
-                        if (this.state.mousedown) {
-                            var distance = this.state.startCoords.subtract(mousePosition).length();
-                            if (distance > config.nominalStringLength) {
-                                let node = new Node(
-                                    mousePosition.x,
-                                    mousePosition.y,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    false,
-                                    [],
-                                    this.getUniqueID()
-                                );
-                                let newNodes = this.state.newNodes;
-                                let prevNode = newNodes[newNodes.length - 1];
-                                prevNode.connectedNodes.push(node.id);
-                                node.connectedNodes.push(prevNode.id);
-                                newNodes.push(node);
-                                this.setState({
-                                    newNodes,
-                                    startCoords: new Vector(mousePosition.x, mousePosition.y)
-                                });
-                            }
-                        }
-                        let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
-                        this.setState({
-                            hightlightNodeID: nearestNode ? nearestNode.id : null
-                        });
-                        break;
-                }
-            },
-            true
-        );
-        c.addEventListener(
-            "mouseup",
-            e => {
-                var mousePosition = this.state.mousePosition;
-                this.setState({ mousedown: false });
-                switch (this.props.selectedControl) {
-                    case ControlsEnum.grab:
-                        if (this.state.selectedNode) {
-                            this.props.worker.postMessage(["nomove", { selectedNode: this.state.selectedNode }]);
-                        }
-                        this.setState({ selectedNode: null });
-                        break;
-                    case ControlsEnum.pan:
-                        this.setState({
-                            startCoords: null
-                        });
-                        break;
-                    case ControlsEnum.rope:
-                        let node = this.state.newNodes[this.state.newNodes.length - 1];
-                        let nodes = this.props.nodes;
-                        let nearestNode = this.getNearestNode(mousePosition, 5, nodes);
-                        if (nearestNode) {
-                            node.connectedNodes.push(nearestNode.id);
-                            nodes = this.props.nodes.map(n => {
-                                if (n.id === nearestNode.id) {
-                                    n.connectedNodes.push(node.id);
-                                }
-                                return n;
-                            });
-                        }
-                        this.props.worker.postMessage(["addnodes", { nodes: this.state.newNodes }]);
-                        this.setState({
-                            newNodes: [],
-                            nodes: nodes.concat(this.state.newNodes)
-                        });
-                        break;
-                }
-            },
-            true
-        );
+        c.addEventListener("mousedown", this.handleInteractStart, true);
+        c.addEventListener("touchstart", (e) => {
+            this.updateMousePosition(e);
+            this.handleInteractStart(e);
+        }, true);
+        c.addEventListener("mousemove", this.handleInteractMove, true);
+        c.addEventListener("touchmove", (e) => {
+            this.updateMousePosition(e);
+            this.handleInteractMove(e);
+        }, true);
+        c.addEventListener("mouseup", this.handleInteractEnd, true);
+        c.addEventListener("touchend", (e) => {
+            //this.updateMousePosition(e)
+            this.handleInteractEnd(e)
+        }, true);
         /*
         document.onkeypress = function(e) {
             e = e || window.event;
@@ -266,7 +125,167 @@ export default class Canvas extends Component {
         };*/
     };
 
+    handleInteractStart = (e) => {
+        e.preventDefault();
+        var c = this.canvas;
+        var rect = c.getBoundingClientRect();
+        var mousePosition = this.state.mousePosition;
+        this.setState({ mousedown: true });
+        switch (this.props.selectedControl) {
+            case ControlsEnum.grab:
+                let hightlightNodeID = this.state.hightlightNodeID;
+                let selectedNode = this.getNearestNode(mousePosition, 20, this.props.nodes);
+                this.setState({
+                    selectedNode
+                });
+                break;
+            case ControlsEnum.pan:
+                this.setState({
+                    startCoords: this.getMouseScreenPosition(e).subtract(this.state.transform.translate)
+                });
+                break;
+            case ControlsEnum.anchor:
+                this.props.worker.postMessage(["newanchor", { mousePosition }]);
+                break;
+            case ControlsEnum.erase:
+                let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
+                nearestNodes.forEach(node => {
+                    this.props.worker.postMessage(["deletenode", { node: node }]);
+                });
+                break;
+            case ControlsEnum.rope:
+                let node = new Node(mousePosition.x, mousePosition.y, 0, 0, 0, 0, false, [], this.getUniqueID());
+                let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                if (nearestNode) {
+                    node.connectedNodes.push(nearestNode.id);
+                    nearestNode.connectedNodes.push(node.id);
+                }
+                this.setState({
+                    startCoords: new Vector(node.position.x, node.position.y),
+                    newNodes: [node]
+                });
+                break;
+        }
+    }
+
+    handleInteractMove = (e) => {
+        e.preventDefault();
+        var mouse = this.getMouseScreenPosition(e);
+        var mousePosition = this.getMouseCanvasPosition(e);
+        this.setState({
+            mousePosition
+        });
+        switch (this.props.selectedControl) {
+            case ControlsEnum.grab:
+                // Only uses updated mousePosition
+                if (!this.state.mousedown) {
+                    let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                    this.setState({
+                        hightlightNodeID: nearestNode ? nearestNode.id : null
+                    });
+                }
+                break;
+            case ControlsEnum.pan:
+                if (this.state.mousedown) {
+                    this.setState({
+                        transform: {
+                            translate: new Vector(mouse.x, mouse.y).subtract(this.state.startCoords),
+                            scale: this.state.transform.scale
+                        }
+                    });
+                }
+                break;
+            case ControlsEnum.erase:
+                if (this.state.mousedown) {
+                    let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
+                    nearestNodes.forEach(node => {
+                        this.props.worker.postMessage(["deletenode", { node: node }]);
+                    });
+                } else {
+                    let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                    this.setState({
+                        hightlightNodeID: nearestNode ? nearestNode.id : null
+                    });
+                }
+                break;
+            case ControlsEnum.rope:
+                if (this.state.mousedown) {
+                    var distance = this.state.startCoords.subtract(mousePosition).length();
+                    if (distance > config.nominalStringLength) {
+                        let node = new Node(mousePosition.x, mousePosition.y, 0, 0, 0, 0, false, [], this.getUniqueID());
+                        let newNodes = this.state.newNodes;
+                        let prevNode = newNodes[newNodes.length - 1];
+                        prevNode.connectedNodes.push(node.id);
+                        node.connectedNodes.push(prevNode.id);
+                        newNodes.push(node);
+                        this.setState({
+                            newNodes,
+                            startCoords: new Vector(mousePosition.x, mousePosition.y)
+                        });
+                    }
+                }
+                let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                this.setState({
+                    hightlightNodeID: nearestNode ? nearestNode.id : null
+                });
+                break;
+        }
+    }
+
+    handleInteractEnd = (e) => {
+        e.preventDefault();
+        var mousePosition = this.state.mousePosition;
+        this.setState({ mousedown: false });
+        switch (this.props.selectedControl) {
+            case ControlsEnum.grab:
+                if (this.state.selectedNode) {
+                    this.props.worker.postMessage(["nomove", { selectedNode: this.state.selectedNode }]);
+                }
+                this.setState({ selectedNode: null });
+                break;
+            case ControlsEnum.pan:
+                this.setState({
+                    startCoords: null
+                });
+                break;
+            case ControlsEnum.rope:
+                let node = this.state.newNodes[this.state.newNodes.length - 1];
+                let nodes = this.props.nodes;
+                let nearestNode = this.getNearestNode(mousePosition, 5, nodes);
+                if (nearestNode) {
+                    node.connectedNodes.push(nearestNode.id);
+                    nodes = this.props.nodes.map(n => {
+                        if (n.id === nearestNode.id) {
+                            n.connectedNodes.push(node.id);
+                        }
+                        return n;
+                    });
+                }
+                this.props.worker.postMessage(["addnodes", { nodes: this.state.newNodes }]);
+                this.setState({
+                    newNodes: [],
+                    nodes: nodes.concat(this.state.newNodes)
+                });
+                break;
+        }
+    }
+
     draw = () => {
+        // If scale changes then set the translate transform so that the zoom
+        // happenens at the center of the view
+        if (this.state.transform.scale.x !== this.props.scale) {
+            let canvasSize = new Vector(this.canvas.width, this.canvas.height);
+            let newScale = new Vector(this.props.scale, this.props.scale);
+            let currentSize = this.state.transform.scale.multiply(canvasSize);
+            let newSize = newScale.multiply(canvasSize);
+            let canvasZoomTranslate = newSize.subtract(currentSize).divide(2);
+            this.setState({
+                transform: {
+                    translate: this.state.transform.translate.subtract(canvasZoomTranslate),
+                    scale: new Vector(this.props.scale, this.props.scale)
+                }
+            })
+        }
         var showIDs = this.props.options.showIDs;
         // Clear and reset canvas
         const ctx = this.canvas.getContext("2d");
@@ -276,12 +295,11 @@ export default class Canvas extends Component {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.restore();
-        //ctx.translate(this.canvas.width/2, this.canvas.height/2);
         ctx.setTransform(
-            this.props.scale,
+            this.state.transform.scale.x,
             0,
             0,
-            this.props.scale,
+            this.state.transform.scale.y,
             this.state.transform.translate.x,
             this.state.transform.translate.y
         );
@@ -289,44 +307,44 @@ export default class Canvas extends Component {
 
         // Draw grid
         var gridSize = 10 * config.metre;
-        var offsetx = (this.state.transform.translate.x / this.props.scale) % gridSize;
-        var offsety = (this.state.transform.translate.y / this.props.scale) % gridSize;
-        for (let x = 0 - 2 * gridSize; x < this.canvas.width / this.props.scale + gridSize; x = x + gridSize) {
+        var offsetx = (this.state.transform.translate.x / this.state.transform.scale.x) % gridSize;
+        var offsety = (this.state.transform.translate.y / this.state.transform.scale.y) % gridSize;
+        for (let x = 0 - 2 * gridSize; x < this.canvas.width / this.state.transform.scale.x + gridSize; x = x + gridSize) {
             ctx.beginPath();
             ctx.strokeStyle = "#d0d0d0";
             ctx.moveTo(
-                x - this.state.transform.translate.x / this.props.scale + offsetx,
-                0 - gridSize - this.state.transform.translate.y / this.props.scale + offsety
+                x - this.state.transform.translate.x / this.state.transform.scale.x + offsetx,
+                0 - gridSize - this.state.transform.translate.y / this.state.transform.scale.x + offsety
             );
             ctx.lineTo(
-                x - this.state.transform.translate.x / this.props.scale + offsetx,
-                this.canvas.height / this.props.scale -
-                    this.state.transform.translate.y / this.props.scale +
-                    offsety +
-                    gridSize
+                x - this.state.transform.translate.x / this.state.transform.scale.x + offsetx,
+                this.canvas.height / this.state.transform.scale.x -
+                this.state.transform.translate.y / this.state.transform.scale.x +
+                offsety +
+                gridSize
             );
             ctx.stroke();
         }
-        for (let y = 0 - 2 * gridSize; y < this.canvas.height / this.props.scale + gridSize; y = y + gridSize) {
+        for (let y = 0 - 2 * gridSize; y < this.canvas.height / this.state.transform.scale.y + gridSize; y = y + gridSize) {
             ctx.beginPath();
             ctx.strokeStyle = "#d0d0d0";
             ctx.moveTo(
-                0 - gridSize - this.state.transform.translate.x / this.props.scale + offsetx,
-                y - this.state.transform.translate.y / this.props.scale + offsety
+                0 - gridSize - this.state.transform.translate.x / this.state.transform.scale.y + offsetx,
+                y - this.state.transform.translate.y / this.state.transform.scale.y + offsety
             );
             ctx.lineTo(
-                this.canvas.width / this.props.scale -
-                    this.state.transform.translate.x / this.props.scale +
-                    offsetx +
-                    gridSize,
-                y - this.state.transform.translate.y / this.props.scale + offsety
+                this.canvas.width / this.state.transform.scale.y -
+                this.state.transform.translate.x / this.state.transform.scale.y +
+                offsetx +
+                gridSize,
+                y - this.state.transform.translate.y / this.state.transform.scale.y + offsety
             );
             ctx.stroke();
         }
 
         // Draw indicators around cursor if needed
         ctx.strokeStyle = "rgb(0,0,0)";
-        if (this.props.selectedControl === ControlsEnum.erase) {
+        if (this.state.mousedown && this.props.selectedControl === ControlsEnum.erase) {
             ctx.beginPath();
             ctx.arc(this.state.mousePosition.x, this.state.mousePosition.y, 5, 0, 2 * Math.PI);
             ctx.stroke();
@@ -379,11 +397,15 @@ export default class Canvas extends Component {
         nodes.concat(this.state.newNodes).forEach(node => {
             if (node.connectedNodes.length <= 0) {
                 ctx.beginPath();
+                if (node.id === this.state.hightlightNodeID) {
+                    ctx.fillStyle = "rgb(0, 255, 0)";
+                }
                 if (node.fixed) {
                     ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
                 } else {
                     ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
                 }
+                ctx.fillStyle = "rgb(0, 0, 0)";
                 if (showIDs) {
                     ctx.fillText(node.id, node.position.x + 1, node.position.y);
                 }
