@@ -32,6 +32,10 @@ Vector.prototype = {
   divide: function(v) {
     if (v instanceof Vector) return new Vector(this.x / v.x, this.y / v.y, this.z / v.z);
     else return new Vector(this.x / v, this.y / v, this.z / v);
+  },  
+  modulus: function(v) {
+    if (v instanceof Vector) return new Vector(this.x % v.x, this.y % v.y, this.z % v.z);
+    else return new Vector(this.x % v, this.y % v, this.z % v);
   },
   equals: function(v) {
     return this.x == v.x && this.y == v.y && this.z == v.z;

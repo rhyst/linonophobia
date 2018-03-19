@@ -26,15 +26,6 @@ export default class Canvas extends Component {
         this.setupInteractions();
     }
 
-    componentWillReceiveProps(props) {
-        /*this.setState({
-            transform: {
-                translate: this.state.transform.translate,
-                scale: new Vector(props.scale)
-            }
-        })*/
-    }
-
     componentDidUpdate() {
         this.draw();
         if (this.state.selectedNode) {
@@ -77,7 +68,7 @@ export default class Canvas extends Component {
         var mousePosition = this.getMouseCanvasPosition(event);
         this.setState({
             mousePosition
-        }); 
+        });
     }
 
     getNearestNode = (position, radius, nodes) => {
@@ -303,41 +294,34 @@ export default class Canvas extends Component {
             this.state.transform.translate.x,
             this.state.transform.translate.y
         );
-        //ctx.translate(-this.canvas.width/2, -this.canvas.height/2);
 
-        // Draw grid
-        var gridSize = 10 * config.metre;
-        var offsetx = (this.state.transform.translate.x / this.state.transform.scale.x) % gridSize;
-        var offsety = (this.state.transform.translate.y / this.state.transform.scale.y) % gridSize;
-        for (let x = 0 - 2 * gridSize; x < this.canvas.width / this.state.transform.scale.x + gridSize; x = x + gridSize) {
+        // Draw background grid grid
+        ctx.strokeStyle = "#d0d0d0";
+        let gridSize = 10 * config.metre;
+        let transformedCanvas = new Vector(this.canvas.width, this.canvas.height).divide(this.state.transform.scale).add(gridSize);        
+        let transformedOrigin = this.state.transform.translate.divide(this.state.transform.scale);
+        let offset = transformedOrigin.modulus(gridSize);
+        for (let x = 0; x < transformedCanvas.x; x = x + gridSize) {
             ctx.beginPath();
-            ctx.strokeStyle = "#d0d0d0";
             ctx.moveTo(
-                x - this.state.transform.translate.x / this.state.transform.scale.x + offsetx,
-                0 - gridSize - this.state.transform.translate.y / this.state.transform.scale.x + offsety
+                x - transformedOrigin.x + offset.x,
+                0 - transformedOrigin.y + offset.y
             );
             ctx.lineTo(
-                x - this.state.transform.translate.x / this.state.transform.scale.x + offsetx,
-                this.canvas.height / this.state.transform.scale.x -
-                this.state.transform.translate.y / this.state.transform.scale.x +
-                offsety +
-                gridSize
+                x - transformedOrigin.x + offset.x,
+                transformedCanvas.y - transformedOrigin.y + offset.x
             );
             ctx.stroke();
         }
-        for (let y = 0 - 2 * gridSize; y < this.canvas.height / this.state.transform.scale.y + gridSize; y = y + gridSize) {
+        for (let y = 0; y < transformedCanvas.y; y = y + gridSize) {
             ctx.beginPath();
-            ctx.strokeStyle = "#d0d0d0";
             ctx.moveTo(
-                0 - gridSize - this.state.transform.translate.x / this.state.transform.scale.y + offsetx,
-                y - this.state.transform.translate.y / this.state.transform.scale.y + offsety
+                0 - transformedOrigin.x + offset.x,
+                y - transformedOrigin.y + offset.y
             );
             ctx.lineTo(
-                this.canvas.width / this.state.transform.scale.y -
-                this.state.transform.translate.x / this.state.transform.scale.y +
-                offsetx +
-                gridSize,
-                y - this.state.transform.translate.y / this.state.transform.scale.y + offsety
+                transformedCanvas.x - transformedOrigin.x + offset.x,
+                y - transformedOrigin.y + offset.y
             );
             ctx.stroke();
         }
