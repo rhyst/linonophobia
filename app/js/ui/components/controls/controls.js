@@ -1,5 +1,5 @@
 import { h, Component } from "preact";
-import { ControlsEnum } from "js/shared/constants.js";
+import { ControlsEnum, ActionsEnum } from "js/shared/constants.js";
 
 export default class Controls extends Component {
     constructor(props) {
@@ -85,7 +85,7 @@ export default class Controls extends Component {
                         class={`button is-small ${this.props.selectedControl ==
                             ControlsEnum.pause && "is-primary"}`}
                         onClick={() => {
-                            this.props.worker.postMessage(this.state.paused ? "run" : "pause")
+                            this.props.worker.postMessage({type: this.state.paused ? ActionsEnum.run : ActionsEnum.pause})
                             this.setState({paused: !this.state.paused});
                         }}>
                         <span class="icon">

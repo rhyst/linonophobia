@@ -2,44 +2,59 @@ const helper = require("js/shared/helper");
 const config = require("js/shared/config");
 const Vector = require("js/shared/vector").Vector;
 const Node = require("js/shared/node").Node;
+const ActionsEnum = require("js/shared/constants").ActionsEnum;
 
 var running = true;
 var nodes = [];
 var lastTime = new Date();
 var trueSimulationSpeed = 0;
+var elapsedTimeSumAverage = 0;
 
 onmessage = function(e) {
-    if (e.data === "init") {
-        init();
-    } else if (e.data === "run") {
-        running = true;
-        doPhysics();
-    } else if (e.data === "pause") {
-        running = false;
-    } else if (e.data === "send") {
-        postMessage({ nodes: nodes, trueSimulationSpeed: trueSimulationSpeed });
-    } else if (e.data[0] === "load") {
-        nodes = JSON.parse(atob(e.data[1]));
-    } else if (e.data[0] === "move") {
-        var node = helper.getNode(e.data[1].selectedNode.id, nodes);
-        node.position = new Vector().load(e.data[1].mousePosition);
-        node.velocity = new Vector();
-        node.force = new Vector();
-    } else if (e.data[0] === "nomove") {
-        //var node = helper.getNode(e.data[1].selectedNode.id, nodes);
-    } else if (e.data[0] === "newanchor") {
-        var position = e.data[1].mousePosition;
-        nodes.push(new Node(position.x, position.y,0,0,0,0,true,[]));
-    } else if (e.data[0] === "deletenode") {
-        var node = e.data[1].node;
-        nodes = nodes.filter(n=>n.id !== node.id).map(n=> {
-            n.connectedNodes = n.connectedNodes.filter(cn => cn !== node.id);
-            return n
-        })
-    } else if (e.data[0] === "addnodes") {
-        var newNodes = e.data[1].nodes;
-        nodes = nodes.concat(newNodes)
-        checkConnections();
+    switch (e.data.type) {
+        case ActionsEnum.init:
+            init();
+            break;
+        case ActionsEnum.run:
+            running = true;
+            doPhysics();
+            break;
+        case ActionsEnum.pause:
+            running = false;
+            break;
+        case ActionsEnum.send:
+            postMessage({ nodes, trueSimulationSpeed, elapsedTimeSumAverage });
+            break;
+        case ActionsEnum.load:
+            nodes = JSON.parse(atob(e.data.nodes));
+            break;
+        case ActionsEnum.move:
+            var node = helper.getNode(e.data.selectedNode.id, nodes);
+            node.position = new Vector().load(e.data.mousePosition);
+            node.velocity = new Vector();
+            node.force = new Vector();
+            node.grabbed = true;
+            break;
+        case ActionsEnum.nomove:
+            var node = helper.getNode(e.data.node.id, nodes);
+            node.grabbed = false;
+            break;
+        case ActionsEnum.addanchor:
+            var position = e.data.mousePosition;
+            nodes.push(new Node(position.x, position.y, 0, 0, 0, 0, true, []));
+            break;
+        case ActionsEnum.deletenode:
+            var node = e.data.node;
+            nodes = nodes.filter(n => n.id !== node.id).map(n => {
+                n.connectedNodes = n.connectedNodes.filter(cn => cn !== node.id);
+                return n;
+            });
+            break;
+        case ActionsEnum.addnodes:
+            var newNodes = e.data.nodes;
+            nodes = nodes.concat(newNodes);
+            checkConnections();
+            break;
     }
 };
 
@@ -68,21 +83,21 @@ function init() {
 
 function checkConnections() {
     //TODO: make less bad
-    let connectedNodes = nodes
+    let connectedNodes = nodes;
     nodes.forEach(n => {
         n.connectedNodes.forEach(cnID => {
             let cn = helper.getNode(cnID, nodes);
             if (cn.connectedNodes.indexOf(n.id) < 0) {
                 connectedNodes = connectedNodes.map(node => {
                     if (node.id === cnID) {
-                        node.connectedNodes.push(n.id)
+                        node.connectedNodes.push(n.id);
                     }
-                    return node
-                })
+                    return node;
+                });
             }
-        })
-    })
-    nodes = connectedNodes
+        });
+    });
+    nodes = connectedNodes;
 }
 
 function doPhysics() {
@@ -101,27 +116,15 @@ function get_a(node) {
         if (connectedNode) {
             var stringLength = helper.getLength(connectedNode, node);
             if (stringLength > config.nominalStringLength) {
-                var lengthDifference =
-                    stringLength - config.nominalStringLength;
-                var angleFromHorizontal = helper.getAngleFromHorizontal(
-                    node,
-                    connectedNode
-                );
-                ySpringForce +=
-                    Math.sin(angleFromHorizontal) *
-                    lengthDifference *
-                    config.springConstant;
-                xSpringForce +=
-                    Math.cos(angleFromHorizontal) *
-                    lengthDifference *
-                    config.springConstant;
+                var lengthDifference = stringLength - config.nominalStringLength;
+                var angleFromHorizontal = helper.getAngleFromHorizontal(node, connectedNode);
+                ySpringForce += Math.sin(angleFromHorizontal) * lengthDifference * config.springConstant;
+                xSpringForce += Math.cos(angleFromHorizontal) * lengthDifference * config.springConstant;
             }
             xVelocityDampingForce +=
-                config.internalViscousFrictionConstant *
-                (node.velocity.x - connectedNode.velocity.x);
+                config.internalViscousFrictionConstant * (node.velocity.x - connectedNode.velocity.x);
             yVelocityDampingForce +=
-                config.internalViscousFrictionConstant *
-                (node.velocity.y - connectedNode.velocity.y);
+                config.internalViscousFrictionConstant * (node.velocity.y - connectedNode.velocity.y);
         }
     });
 
@@ -132,64 +135,59 @@ function get_a(node) {
     var xViscousForce = node.velocity.x * config.viscousConstant;
 
     // Total force
-    node.force.y =
-        yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce;
-    node.force.x =
-        xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce;
+    node.force.y = yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce;
+    node.force.x = xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce;
 
-    return new Vector(
-        node.force.x / config.ropeWeightPerNode,
-        node.force.y / config.ropeWeightPerNode
-    );
+    return new Vector(node.force.x / config.ropeWeightPerNode, node.force.y / config.ropeWeightPerNode);
 }
 
 function physics() {
-    var simSpeedQuantity = 0;
-    var simulationSpeedSum = 0;
-    for (var j = 0; j < 100; j++) {
+    let simSpeedQuantity = 0;
+    let simulationSpeedSum = 0;
+    let elapsedTimeSum = 0;
+    for (let j = 0; j < 100; j++) {
         // Timing and simulation speed
-        var newTime = self.performance.now();
-        var actualElapsedMilliseconds = newTime - lastTime;
-        var actualElapsedTime = actualElapsedMilliseconds / 1000;
-        var elapsedMilliseconds =
-            actualElapsedMilliseconds * config.simulationSpeed;
+        let newTime = self.performance.now();
+        let actualElapsedMilliseconds = newTime - lastTime;
+        let actualElapsedTime = actualElapsedMilliseconds / 1000;
+        let elapsedMilliseconds = actualElapsedMilliseconds * config.simulationSpeed;
         if (elapsedMilliseconds > config.maxStep) {
             elapsedTime = config.maxStep / 1000;
-            console.warn(
-                "Max step exceeded, simulation speed may not be correct."
-            );
+            console.warn("Max step exceeded, simulation speed may not be correct.");
         } else {
             elapsedTime = elapsedMilliseconds / 1000;
         }
-        var actualSimulationSpeed = elapsedTime / actualElapsedTime;
+        let actualSimulationSpeed = elapsedTime / actualElapsedTime;
         if (!isNaN(actualSimulationSpeed)) {
             simSpeedQuantity += 1;
             simulationSpeedSum += actualSimulationSpeed;
+            elapsedTimeSum += elapsedMilliseconds;
         }
         lastTime = newTime;
-
+        let newNodes = [];
         // Physics
-        for (var i = 0; i < nodes.length; i++) {
-            var node = nodes[i];
-            if (!node.fixed) {
-                node.velocity.x = node.velocity.x + (node.force.x / config.ropeWeightPerNode * elapsedTime / 2);
-                node.velocity.y = node.velocity.y + (node.force.y / config.ropeWeightPerNode * elapsedTime / 2);
+        for (let i = 0; i < nodes.length; i++) {
+            let node = nodes[i].copy();
+            if (!node.fixed && !node.grabbed) {
+                node.velocity.x = node.velocity.x + node.force.x / config.ropeWeightPerNode * elapsedTime / 2;
+                node.velocity.y = node.velocity.y + node.force.y / config.ropeWeightPerNode * elapsedTime / 2;
 
                 // x
-                node.position.y =
-                    node.position.y + node.velocity.y * elapsedTime;
-                node.position.x =
-                    node.position.x + node.velocity.x * elapsedTime;
+                node.position.y = node.position.y + node.velocity.y * elapsedTime;
+                node.position.x = node.position.x + node.velocity.x * elapsedTime;
 
                 // v
-                dv = get_a(node).multiply(elapsedTime/2);
+                dv = get_a(node).multiply(elapsedTime / 2);
                 node.velocity.x = node.velocity.x + dv.x;
                 node.velocity.y = node.velocity.y + dv.y;
             }
+            newNodes.push(node);
         }
+        nodes = newNodes;
     }
     trueSimulationSpeed = simulationSpeedSum / simSpeedQuantity;
-    if (running) {
+    elapsedTimeSumAverage = elapsedTimeSum / simSpeedQuantity;
+    if (running) {elapsedTimeSumAverage
         setTimeout(physics, 0);
     }
 }

@@ -1,3 +1,4 @@
+
 // See http://brunch.io for documentation.
 module.exports = {
     files: {
@@ -37,7 +38,7 @@ module.exports = {
             ]
         },
         sass: {
-            mode: "ruby", //"native",
+            mode: process.platform === 'linux' ? "native" : "ruby",
             options: {
                 includePaths: ["node_modules/bulma"]
             }

@@ -6,3 +6,21 @@ export const ControlsEnum = Object.freeze({
     rope:   "rope",
     pause:  "pause",
 });
+
+export const ActionsEnum = Object.freeze({
+    init:       "init",
+    run:        "run",
+    pause:      "pause",
+    send:       "send",
+    load:       "load",
+    move:       "move",
+    nomove:     "nomove",
+    addanchor:  "addanchor",
+    addnodes:   "addnodes",
+    deletenode: "deletenode"
+})
+
+module.exports = {
+    ControlsEnum,
+    ActionsEnum
+}

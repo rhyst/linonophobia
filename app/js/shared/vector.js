@@ -37,6 +37,9 @@ Vector.prototype = {
     if (v instanceof Vector) return new Vector(this.x % v.x, this.y % v.y, this.z % v.z);
     else return new Vector(this.x % v, this.y % v, this.z % v);
   },
+  positive: function() {
+    return new Vector(Math.abs(this.x),Math.abs(this.y),Math.abs(this.z))
+  },
   equals: function(v) {
     return this.x == v.x && this.y == v.y && this.z == v.z;
   },

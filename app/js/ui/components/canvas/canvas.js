@@ -3,7 +3,7 @@ import * as config from "js/shared/config";
 import * as helper from "js/shared/helper";
 import { Vector } from "js/shared/vector";
 import { Node } from "js/shared/node";
-import { ControlsEnum } from "js/shared/constants";
+import { ControlsEnum, ActionsEnum } from "js/shared/constants";
 
 export default class Canvas extends Component {
     constructor(props) {
@@ -29,13 +29,11 @@ export default class Canvas extends Component {
     componentDidUpdate() {
         this.draw();
         if (this.state.selectedNode) {
-            this.props.worker.postMessage([
-                "move",
-                {
-                    selectedNode: this.state.selectedNode,
-                    mousePosition: this.state.mousePosition
-                }
-            ]);
+            this.props.worker.postMessage({
+                type: ActionsEnum.move,
+                selectedNode: this.state.selectedNode,
+                mousePosition: this.state.mousePosition
+            });
         }
     }
 
@@ -52,7 +50,7 @@ export default class Canvas extends Component {
 
     getMouseScreenPosition = event => {
         let rect = this.canvas.getBoundingClientRect();
-        if (event.type.includes('touch')) {
+        if (event.type.includes("touch")) {
             return new Vector(event.touches[0].clientX - rect.left, event.touches[0].clientY - rect.top);
         } else {
             return new Vector(event.clientX - rect.left, event.clientY - rect.top);
@@ -69,7 +67,7 @@ export default class Canvas extends Component {
         this.setState({
             mousePosition
         });
-    }
+    };
 
     getNearestNode = (position, radius, nodes) => {
         let nearestNodes = this.getNearestNodes(position, radius, nodes);
@@ -95,20 +93,32 @@ export default class Canvas extends Component {
     setupInteractions = () => {
         var c = this.canvas;
         c.addEventListener("mousedown", this.handleInteractStart, true);
-        c.addEventListener("touchstart", (e) => {
-            this.updateMousePosition(e);
-            this.handleInteractStart(e);
-        }, true);
+        c.addEventListener(
+            "touchstart",
+            e => {
+                this.updateMousePosition(e);
+                this.handleInteractStart(e);
+            },
+            true
+        );
         c.addEventListener("mousemove", this.handleInteractMove, true);
-        c.addEventListener("touchmove", (e) => {
-            this.updateMousePosition(e);
-            this.handleInteractMove(e);
-        }, true);
+        c.addEventListener(
+            "touchmove",
+            e => {
+                this.updateMousePosition(e);
+                this.handleInteractMove(e);
+            },
+            true
+        );
         c.addEventListener("mouseup", this.handleInteractEnd, true);
-        c.addEventListener("touchend", (e) => {
-            //this.updateMousePosition(e)
-            this.handleInteractEnd(e)
-        }, true);
+        c.addEventListener(
+            "touchend",
+            e => {
+                //this.updateMousePosition(e)
+                this.handleInteractEnd(e);
+            },
+            true
+        );
         /*
         document.onkeypress = function(e) {
             e = e || window.event;
@@ -116,7 +126,7 @@ export default class Canvas extends Component {
         };*/
     };
 
-    handleInteractStart = (e) => {
+    handleInteractStart = e => {
         e.preventDefault();
         var c = this.canvas;
         var rect = c.getBoundingClientRect();
@@ -136,12 +146,12 @@ export default class Canvas extends Component {
                 });
                 break;
             case ControlsEnum.anchor:
-                this.props.worker.postMessage(["newanchor", { mousePosition }]);
+                this.props.worker.postMessage({type: ActionsEnum.addanchor, mousePosition });
                 break;
             case ControlsEnum.erase:
                 let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
                 nearestNodes.forEach(node => {
-                    this.props.worker.postMessage(["deletenode", { node: node }]);
+                    this.props.worker.postMessage({type: ActionsEnum.deletenode, node: node });
                 });
                 break;
             case ControlsEnum.rope:
@@ -157,9 +167,9 @@ export default class Canvas extends Component {
                 });
                 break;
         }
-    }
+    };
 
-    handleInteractMove = (e) => {
+    handleInteractMove = e => {
         e.preventDefault();
         var mouse = this.getMouseScreenPosition(e);
         var mousePosition = this.getMouseCanvasPosition(e);
@@ -178,9 +188,11 @@ export default class Canvas extends Component {
                 break;
             case ControlsEnum.pan:
                 if (this.state.mousedown) {
+                    let translate = new Vector(mouse.x, mouse.y).subtract(this.state.startCoords);
+                    this.props.changeOriginCoords(translate.multiply(-1))
                     this.setState({
                         transform: {
-                            translate: new Vector(mouse.x, mouse.y).subtract(this.state.startCoords),
+                            translate,
                             scale: this.state.transform.scale
                         }
                     });
@@ -190,7 +202,7 @@ export default class Canvas extends Component {
                 if (this.state.mousedown) {
                     let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
                     nearestNodes.forEach(node => {
-                        this.props.worker.postMessage(["deletenode", { node: node }]);
+                        this.props.worker.postMessage({type: ActionsEnum.deletenode, node: node });
                     });
                 } else {
                     let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
@@ -203,7 +215,17 @@ export default class Canvas extends Component {
                 if (this.state.mousedown) {
                     var distance = this.state.startCoords.subtract(mousePosition).length();
                     if (distance > config.nominalStringLength) {
-                        let node = new Node(mousePosition.x, mousePosition.y, 0, 0, 0, 0, false, [], this.getUniqueID());
+                        let node = new Node(
+                            mousePosition.x,
+                            mousePosition.y,
+                            0,
+                            0,
+                            0,
+                            0,
+                            false,
+                            [],
+                            this.getUniqueID()
+                        );
                         let newNodes = this.state.newNodes;
                         let prevNode = newNodes[newNodes.length - 1];
                         prevNode.connectedNodes.push(node.id);
@@ -221,18 +243,18 @@ export default class Canvas extends Component {
                 });
                 break;
         }
-    }
+    };
 
-    handleInteractEnd = (e) => {
+    handleInteractEnd = e => {
         e.preventDefault();
         var mousePosition = this.state.mousePosition;
         this.setState({ mousedown: false });
         switch (this.props.selectedControl) {
             case ControlsEnum.grab:
                 if (this.state.selectedNode) {
-                    this.props.worker.postMessage(["nomove", { selectedNode: this.state.selectedNode }]);
+                    this.props.worker.postMessage({type: ActionsEnum.nomove, node: this.state.selectedNode });
+                    this.setState({ selectedNode: null });
                 }
-                this.setState({ selectedNode: null });
                 break;
             case ControlsEnum.pan:
                 this.setState({
@@ -252,14 +274,14 @@ export default class Canvas extends Component {
                         return n;
                     });
                 }
-                this.props.worker.postMessage(["addnodes", { nodes: this.state.newNodes }]);
+                this.props.worker.postMessage({type: ActionsEnum.addnodes, nodes: this.state.newNodes });
                 this.setState({
                     newNodes: [],
                     nodes: nodes.concat(this.state.newNodes)
                 });
                 break;
         }
-    }
+    };
 
     draw = () => {
         // If scale changes then set the translate transform so that the zoom
@@ -270,13 +292,18 @@ export default class Canvas extends Component {
             let currentSize = this.state.transform.scale.multiply(canvasSize);
             let newSize = newScale.multiply(canvasSize);
             let canvasZoomTranslate = newSize.subtract(currentSize).divide(2);
+            let translate = this.state.transform.translate.subtract(canvasZoomTranslate);
             this.setState({
                 transform: {
-                    translate: this.state.transform.translate.subtract(canvasZoomTranslate),
+                    translate,
                     scale: new Vector(this.props.scale, this.props.scale)
                 }
-            })
+            });
+            this.props.changeOriginCoords(translate.multiply(-1))
         }
+        let canvasSize2 = new Vector(this.canvas.width, this.canvas.height);
+        let currentSize2 = canvasSize2.divide(this.state.transform.scale);
+        let center = this.state.transform.translate.divide(this.state.transform.scale).multiply(-1).add(currentSize2.divide(2))
         var showIDs = this.props.options.showIDs;
         // Clear and reset canvas
         const ctx = this.canvas.getContext("2d");
@@ -295,34 +322,28 @@ export default class Canvas extends Component {
             this.state.transform.translate.y
         );
 
+            ctx.fillStyle = "rgb(0, 0, 255)";            
+            ctx.fillRect(center.x - 2, center.y - 2, 5, 5);
+        ctx.fillStyle = "rgb(0, 0, 0)";
+
         // Draw background grid grid
         ctx.strokeStyle = "#d0d0d0";
         let gridSize = 10 * config.metre;
-        let transformedCanvas = new Vector(this.canvas.width, this.canvas.height).divide(this.state.transform.scale).add(gridSize);        
+        let transformedCanvas = new Vector(this.canvas.width, this.canvas.height)
+            .divide(this.state.transform.scale)
+            .add(gridSize);
         let transformedOrigin = this.state.transform.translate.divide(this.state.transform.scale);
         let offset = transformedOrigin.modulus(gridSize);
         for (let x = 0; x < transformedCanvas.x; x = x + gridSize) {
             ctx.beginPath();
-            ctx.moveTo(
-                x - transformedOrigin.x + offset.x,
-                0 - transformedOrigin.y + offset.y
-            );
-            ctx.lineTo(
-                x - transformedOrigin.x + offset.x,
-                transformedCanvas.y - transformedOrigin.y + offset.x
-            );
+            ctx.moveTo(x - transformedOrigin.x + offset.x, 0 - transformedOrigin.y);
+            ctx.lineTo(x - transformedOrigin.x + offset.x, transformedCanvas.y - transformedOrigin.y);
             ctx.stroke();
         }
         for (let y = 0; y < transformedCanvas.y; y = y + gridSize) {
             ctx.beginPath();
-            ctx.moveTo(
-                0 - transformedOrigin.x + offset.x,
-                y - transformedOrigin.y + offset.y
-            );
-            ctx.lineTo(
-                transformedCanvas.x - transformedOrigin.x + offset.x,
-                y - transformedOrigin.y + offset.y
-            );
+            ctx.moveTo(0 - transformedOrigin.x, y - transformedOrigin.y + offset.y);
+            ctx.lineTo(transformedCanvas.x - transformedOrigin.x, y - transformedOrigin.y + offset.y);
             ctx.stroke();
         }
 
@@ -344,20 +365,6 @@ export default class Canvas extends Component {
         // Draw all lines and nodes
         var drawn = [];
         let drawLine = (node, nodes, connectedNodeID) => {
-            ctx.beginPath();
-            if (node.id === this.state.hightlightNodeID) {
-                ctx.fillStyle = "rgb(0, 255, 0)";
-            }
-            if (node.fixed) {
-                ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
-            } else {
-                ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
-            }
-            ctx.fillStyle = "rgb(0, 0, 0)";
-            if (showIDs) {
-                ctx.fillText(node.id, node.position.x + 1, node.position.y);
-            }
-            ctx.stroke();
             if (drawn.indexOf(connectedNodeID.toString() + node.id.toString()) < 0) {
                 ctx.beginPath();
                 var connectedNode = helper.getNode(connectedNodeID, nodes);
@@ -379,23 +386,21 @@ export default class Canvas extends Component {
             }
         };
         nodes.concat(this.state.newNodes).forEach(node => {
-            if (node.connectedNodes.length <= 0) {
-                ctx.beginPath();
-                if (node.id === this.state.hightlightNodeID) {
-                    ctx.fillStyle = "rgb(0, 255, 0)";
-                }
-                if (node.fixed) {
-                    ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
-                } else {
-                    ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
-                }
-                ctx.fillStyle = "rgb(0, 0, 0)";
-                if (showIDs) {
-                    ctx.fillText(node.id, node.position.x + 1, node.position.y);
-                }
-                ctx.stroke();
-            }
             node.connectedNodes.forEach(drawLine.bind(this, node, nodes.concat(this.state.newNodes)));
+            ctx.beginPath();
+            if (node.id === this.state.hightlightNodeID) {
+                ctx.fillStyle = "rgb(0, 255, 0)";
+            }
+            if (node.fixed) {
+                ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
+            } else {
+                ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
+            }
+            ctx.fillStyle = "rgb(0, 0, 0)";
+            if (showIDs) {
+                ctx.fillText(node.id, node.position.x + 1, node.position.y);
+            }
+            ctx.stroke();
         });
     };
     render() {
