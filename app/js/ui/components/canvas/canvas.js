@@ -14,11 +14,11 @@ export default class Canvas extends Component {
             newNodes: [],
             mousePosition: new Vector(0, 0),
             startCoords: new Vector(0, 0),
-            lastCoords: new Vector(0, 0),
             transform: {
                 translate: new Vector(0, 0),
                 scale: new Vector(0, 0)
-            }
+            },
+            hightlightNodeID: null
         };
     }
 
@@ -80,7 +80,7 @@ export default class Canvas extends Component {
         });
         return nearby
             .sort((a, b) => {
-                return a - b;
+                return a.distance - b.distance;
             })
             .map(n => n.node);
     };
@@ -97,6 +97,7 @@ export default class Canvas extends Component {
                 this.setState({ mousedown: true });
                 switch (this.props.selectedControl) {
                     case ControlsEnum.grab:
+                        let hightlightNodeID = this.state.hightlightNodeID;
                         let selectedNode = this.getNearestNode(mousePosition, 20, this.props.nodes);
                         this.setState({
                             selectedNode
@@ -153,6 +154,12 @@ export default class Canvas extends Component {
                 switch (this.props.selectedControl) {
                     case ControlsEnum.grab:
                         // Only uses updated mousePosition
+                        if (!this.state.mousedown) {
+                            let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                            this.setState({
+                                hightlightNodeID: nearestNode ? nearestNode.id : null
+                            });
+                        }
                         break;
                     case ControlsEnum.pan:
                         if (this.state.mousedown) {
@@ -169,6 +176,11 @@ export default class Canvas extends Component {
                             let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
                             nearestNodes.forEach(node => {
                                 this.props.worker.postMessage(["deletenode", { node: node }]);
+                            });
+                        } else {
+                            let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                            this.setState({
+                                hightlightNodeID: nearestNode ? nearestNode.id : null
                             });
                         }
                         break;
@@ -198,6 +210,10 @@ export default class Canvas extends Component {
                                 });
                             }
                         }
+                        let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
+                        this.setState({
+                            hightlightNodeID: nearestNode ? nearestNode.id : null
+                        });
                         break;
                 }
             },
@@ -326,14 +342,16 @@ export default class Canvas extends Component {
         // Draw all lines and nodes
         var drawn = [];
         let drawLine = (node, nodes, connectedNodeID) => {
-            var nodessss = this.props.nodes;
-            var newnodesssss = this.state.newNodes;
             ctx.beginPath();
+            if (node.id === this.state.hightlightNodeID) {
+                ctx.fillStyle = "rgb(0, 255, 0)";
+            }
             if (node.fixed) {
                 ctx.fillRect(node.position.x - 2, node.position.y - 2, 5, 5);
             } else {
                 ctx.fillRect(node.position.x - 1, node.position.y - 1, 3, 3);
             }
+            ctx.fillStyle = "rgb(0, 0, 0)";
             if (showIDs) {
                 ctx.fillText(node.id, node.position.x + 1, node.position.y);
             }
