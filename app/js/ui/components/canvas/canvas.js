@@ -18,12 +18,22 @@ export default class Canvas extends Component {
                 translate: new Vector(0, 0),
                 scale: new Vector(1, 1)
             },
+            scaled: false,
             hightlightNodeID: null
         };
     }
 
     componentDidMount() {
         this.setupInteractions();
+    }
+
+    componentWillReceiveProps(props) {
+        this.setState({
+            transform: {
+                translate: this.state.transform.translate,
+                scale: new Vector(this.props.scale, this.props.scale)
+            },
+        })
     }
 
     componentDidUpdate() {
@@ -92,6 +102,7 @@ export default class Canvas extends Component {
 
     setupInteractions = () => {
         var c = this.canvas;
+        // Mouse and touch events
         c.addEventListener("mousedown", this.handleInteractStart, true);
         c.addEventListener(
             "touchstart",
@@ -114,16 +125,40 @@ export default class Canvas extends Component {
         c.addEventListener(
             "touchend",
             e => {
-                //this.updateMousePosition(e)
                 this.handleInteractEnd(e);
             },
             true
         );
-        /*
-        document.onkeypress = function(e) {
-            e = e || window.event;
-            console.log(e.keyCode);
-        };*/
+        // Keyboard events
+        document.onkeydown = (e) => {
+            let move = new Vector(0, 0);
+            switch (e.keyCode) {
+                case 37:
+                    move = new Vector(1, 0);
+                    break;
+                case 38:
+                    move = new Vector(0, 1);
+                    break;
+                case 39:
+                    move = new Vector(-1, 0);
+                    break;
+                case 40:
+                    move = new Vector(0, -1);
+                    break;
+                default:
+                    e = e || window.event;
+                    console.log("Unrecognised key " + e.keyCode);
+                    break;
+            }
+            let translate = this.state.transform.translate.add(move);
+            this.props.changeOriginCoords(translate.multiply(-1))
+            this.setState({
+                transform: {
+                    translate,
+                    scale: this.state.transform.scale
+                }
+            })
+        };
     };
 
     handleInteractStart = e => {
@@ -146,12 +181,12 @@ export default class Canvas extends Component {
                 });
                 break;
             case ControlsEnum.anchor:
-                this.props.worker.postMessage({type: ActionsEnum.addanchor, mousePosition });
+                this.props.worker.postMessage({ type: ActionsEnum.addanchor, mousePosition });
                 break;
             case ControlsEnum.erase:
                 let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
                 nearestNodes.forEach(node => {
-                    this.props.worker.postMessage({type: ActionsEnum.deletenode, node: node });
+                    this.props.worker.postMessage({ type: ActionsEnum.deletenode, node: node });
                 });
                 break;
             case ControlsEnum.rope:
@@ -178,7 +213,6 @@ export default class Canvas extends Component {
         });
         switch (this.props.selectedControl) {
             case ControlsEnum.grab:
-                // Only uses updated mousePosition
                 if (!this.state.mousedown) {
                     let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
                     this.setState({
@@ -202,7 +236,7 @@ export default class Canvas extends Component {
                 if (this.state.mousedown) {
                     let nearestNodes = this.getNearestNodes(mousePosition, 5, this.props.nodes);
                     nearestNodes.forEach(node => {
-                        this.props.worker.postMessage({type: ActionsEnum.deletenode, node: node });
+                        this.props.worker.postMessage({ type: ActionsEnum.deletenode, node: node });
                     });
                 } else {
                     let nearestNode = this.getNearestNode(mousePosition, 5, this.props.nodes);
@@ -252,7 +286,7 @@ export default class Canvas extends Component {
         switch (this.props.selectedControl) {
             case ControlsEnum.grab:
                 if (this.state.selectedNode) {
-                    this.props.worker.postMessage({type: ActionsEnum.nomove, node: this.state.selectedNode });
+                    this.props.worker.postMessage({ type: ActionsEnum.nomove, node: this.state.selectedNode });
                     this.setState({ selectedNode: null });
                 }
                 break;
@@ -274,7 +308,7 @@ export default class Canvas extends Component {
                         return n;
                     });
                 }
-                this.props.worker.postMessage({type: ActionsEnum.addnodes, nodes: this.state.newNodes });
+                this.props.worker.postMessage({ type: ActionsEnum.addnodes, nodes: this.state.newNodes });
                 this.setState({
                     newNodes: [],
                     nodes: nodes.concat(this.state.newNodes)
@@ -286,33 +320,17 @@ export default class Canvas extends Component {
     draw = () => {
         // If scale changes then set the translate transform so that the zoom
         // happenens at the center of the view
-        if (this.state.transform.scale.x !== this.props.scale) {
-            let canvasSize = new Vector(this.canvas.width, this.canvas.height);
-            let newScale = new Vector(this.props.scale, this.props.scale);
-            let currentSize = this.state.transform.scale.multiply(canvasSize);
-            let newSize = newScale.multiply(canvasSize);
-            let canvasZoomTranslate = newSize.subtract(currentSize).divide(2);
-            let translate = this.state.transform.translate.subtract(canvasZoomTranslate);
-            this.setState({
-                transform: {
-                    translate,
-                    scale: new Vector(this.props.scale, this.props.scale)
-                }
-            });
-            this.props.changeOriginCoords(translate.multiply(-1))
-        }
-        let canvasSize2 = new Vector(this.canvas.width, this.canvas.height);
-        let currentSize2 = canvasSize2.divide(this.state.transform.scale);
-        let center = this.state.transform.translate.divide(this.state.transform.scale).multiply(-1).add(currentSize2.divide(2))
-        var showIDs = this.props.options.showIDs;
+        let canvasSize = new Vector(this.canvas.width, this.canvas.height);
+        let currentSize = canvasSize.divide(this.state.transform.scale);
+        let center = this.state.transform.translate.divide(this.state.transform.scale).multiply(-1).add(currentSize.divide(2))
+        let showIDs = this.props.options.showIDs;
+
         // Clear and reset canvas
-        const ctx = this.canvas.getContext("2d");
+        const ctx = this.canvas.getContext("2d", { alpha: false });
         let nodes = this.props.nodes;
         ctx.strokeStyle = "rgb(0,0,0)";
-        ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        ctx.restore();
         ctx.setTransform(
             this.state.transform.scale.x,
             0,
@@ -321,9 +339,21 @@ export default class Canvas extends Component {
             this.state.transform.translate.x,
             this.state.transform.translate.y
         );
+        /*if (this.state.transform.scale.x !== 1) {
+            let canvasSize = new Vector(this.canvas.width, this.canvas.height);
+            let translate = canvasSize.divide(this.state.transform.scale).divide(2);
+            ctx.setTransform(
+                this.state.transform.scale.x,
+                0,
+                0,
+                this.state.transform.scale.y,
+                this.state.transform.translate.x + translate.x,
+                this.state.transform.translate.y + translate.y
+            );
+        }*/
 
-            ctx.fillStyle = "rgb(0, 0, 255)";            
-            ctx.fillRect(center.x - 2, center.y - 2, 5, 5);
+        ctx.fillStyle = "rgb(0, 0, 255)";
+        ctx.fillRect(center.x - 2, center.y - 2, 5, 5);
         ctx.fillStyle = "rgb(0, 0, 0)";
 
         // Draw background grid grid
@@ -363,7 +393,7 @@ export default class Canvas extends Component {
         ctx.stroke();
 
         // Draw all lines and nodes
-        var drawn = [];
+        let drawn = [];
         let drawLine = (node, nodes, connectedNodeID) => {
             if (drawn.indexOf(connectedNodeID.toString() + node.id.toString()) < 0) {
                 ctx.beginPath();
