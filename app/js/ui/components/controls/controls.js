@@ -92,6 +92,13 @@ export default class Controls extends Component {
                             <i class={`fas ${ this.state.paused ? 'fa-play':'fa-pause'}`} />
                         </span>
                     </button>
+                    <button
+                        class={`button is-small`}
+                        onClick={this.props.wasm}>
+                        <span class="icon">
+                            w
+                        </span>
+                    </button>
                     <div
                         class={`dropdown ${this.state.optionsVisible &&
                             "is-active"}`}>

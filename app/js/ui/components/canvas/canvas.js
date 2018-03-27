@@ -326,7 +326,7 @@ export default class Canvas extends Component {
         let showIDs = this.props.options.showIDs;
 
         // Clear and reset canvas
-        const ctx = this.canvas.getContext("2d", { alpha: false });
+        const ctx = this.canvas.getContext("2d");
         let nodes = this.props.nodes;
         ctx.strokeStyle = "rgb(0,0,0)";
         ctx.setTransform(1, 0, 0, 1, 0, 0);

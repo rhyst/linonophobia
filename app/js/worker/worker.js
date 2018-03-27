@@ -3,7 +3,9 @@ const config = require("js/shared/config");
 const Vector = require("js/shared/vector").Vector;
 const Node = require("js/shared/node").Node;
 const ActionsEnum = require("js/shared/constants").ActionsEnum;
+const { ccallArrays, cwrapArrays } = require("js/shared/wasm-arrays");
 
+var wasm;
 var running = true;
 var nodes = [];
 var lastTime = new Date();
@@ -79,6 +81,40 @@ function init() {
 
     var node1 = helper.getNode(1, nodes);
     node1.connectedNodes.push(yhangnode.id);
+
+    Module = {
+        print: () => {
+            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(" ");
+            console.log(text);
+        }
+    }
+    importScripts("calc.js");
+    Module["onRuntimeInitialized"] = () => {
+        const v = (v1, v2) => {
+            if (!v2) {
+                return nodes.map(node => node[v1]);
+            }
+            return nodes.map(node => node[v1]).map(node => node[v2]);
+        };
+        ccallArrays(
+            "setNodes",
+            null,
+            ["array", "array", "array", "array", "array", "array", "array", "array", "array", "number"],
+            [
+                v("id"),
+                v("position", "x"),
+                v("position", "y"),
+                v("velocity", "x"),
+                v("velocity", "y"),
+                v("force", "x"),
+                v("force", "y"),
+                v("fixed").map(f => (f ? 1 : 0)),
+                v("grabbed").map(f => (f ? 1 : 0)),
+                nodes.length
+            ]
+        );
+        ccallArrays("setIDs", null, ["number"], [v("id")]);
+    };
 }
 
 function checkConnections() {
@@ -187,7 +223,8 @@ function physics() {
     }
     trueSimulationSpeed = simulationSpeedSum / simSpeedQuantity;
     elapsedTimeSumAverage = elapsedTimeSum / simSpeedQuantity;
-    if (running) {elapsedTimeSumAverage
+    if (running) {
+        elapsedTimeSumAverage;
         setTimeout(physics, 0);
     }
 }

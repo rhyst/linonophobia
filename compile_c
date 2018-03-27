@@ -1,0 +1,2 @@
+#!/bin/bash
+emcc -std=c++11 -o public/calc.js app/c/calc.cpp -O3 -s "WASM=1" -s "NO_EXIT_RUNTIME=1" -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall"]' -s "EXPORTED_FUNCTIONS=['_malloc','_free']" -s "ALLOW_MEMORY_GROWTH=1" -s "ASSERTIONS=1" -s "INVOKE_RUN=0"
