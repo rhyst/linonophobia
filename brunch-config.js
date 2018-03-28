@@ -38,7 +38,6 @@ module.exports = {
             ]
         },
         sass: {
-            mode: process.platform === 'linux' ? "native" : "ruby",
             options: {
                 includePaths: ["node_modules/bulma"]
             }

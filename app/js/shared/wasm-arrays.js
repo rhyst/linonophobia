@@ -61,9 +61,9 @@ const ccallArrays = (func, returnType, paramTypes, params, {heapIn="HEAPF32", he
     } catch (e) {
         error = e
     } finally {
-        for (let b=0; b<bufs.length; b++) {
-            Module._free(bufs[b])
-        }
+        //for (let b=0; b<bufs.length; b++) {
+        //    Module._free(bufs[b])
+        //}
     }
 
     if (error) throw error
