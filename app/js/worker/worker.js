@@ -90,6 +90,12 @@ function init() {
       }
       return nodes.map(node => node[v1]).map(node => node[v2]);
     };
+    const cns = nodes.map(n => {
+        const typedArray = new Int32Array(n.connectedNodes);
+        const buf = Module._malloc(typedArray.length * typedArray.BYTES_PER_ELEMENT);
+        Module['HEAP32'].set(typedArray, buf >> 2);
+        return {buf: buf, len: n.connectedNodes.length}
+    })
     // Pass in all relevant quantities as seperate arrays
     // Seperate float arrays and int arrays as they need to be
     // on seperate heaps
@@ -111,7 +117,9 @@ function init() {
           nodes.length, 
           v('id'), 
           v('fixed').map(f => (f ? 1 : 0)),
-          v('grabbed').map(f => (f ? 1 : 0))
+          v('grabbed').map(f => (f ? 1 : 0)),
+          cns.map(cn => cn.buf),
+          cns.map(cn => cn.len),
         ],
         {heapIn: 'HEAP32'});
   };

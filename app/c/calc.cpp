@@ -28,17 +28,22 @@ float *g_forceX;
 float *g_forceY;
 int *g_fixed;
 int *g_grabbed;
+int **g_connectedNodes;    // Pointer to array of connected nodes
+int *g_connectedNodesSize; // Size of connected nodes array
 int g_bufSize;
 
 // INITIALISATION METHODS
 
 EMSCRIPTEN_KEEPALIVE
 int setInts(int bufSize, int *id, int idbf, int *fixed, int fbf, int *grabbed,
-            int gbf) {
+            int gbf, int **connectedNodes, int cnbf, int *connectedNodesSize,
+            int cnsbf) {
   g_id = id;
   g_fixed = fixed;
   g_grabbed = grabbed;
   g_bufSize = bufSize;
+  g_connectedNodes = connectedNodes;
+  g_connectedNodesSize = connectedNodesSize;
   return 0;
 }
 
@@ -101,6 +106,12 @@ int *getFixeds() { return g_fixed; }
 EMSCRIPTEN_KEEPALIVE
 int *getGrabbeds() { return g_grabbed; }
 
+EMSCRIPTEN_KEEPALIVE
+int *getConnectedNodesSize() { return g_connectedNodesSize; }
+
+EMSCRIPTEN_KEEPALIVE
+int *getConnectedNodes(int index) { return g_connectedNodes[index]; }
+
 // INPUT METHODS
 
 EMSCRIPTEN_KEEPALIVE
@@ -125,8 +136,12 @@ int setPositionY(int id, float positionY) {
 }
 
 // PHYSICS
-
-void getAcceleration() {}
+void getAcceleration(int nodeIndex) {
+  float ySpringForce = 0;
+  float xSpringForce = 0;
+  float xVelocityDampingForce = 0;
+  float yVelocityDampingForce = 0;
+}
 }
 
-//    EM_ASM_({ console.log('checking ' + $0); }, testId); //
+//    EM_ASM_({ console.log('checking ' + $0); }, testId);
