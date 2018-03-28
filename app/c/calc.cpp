@@ -1,7 +1,6 @@
 #include <emscripten/emscripten.h>
-#include <iostream>
-#include <stdio.h>
-#include <string>
+#include <stdlib.h>
+#include <cmath>
 
 extern "C" {
 
@@ -112,6 +111,27 @@ int *getConnectedNodesSize() { return g_connectedNodesSize; }
 EMSCRIPTEN_KEEPALIVE
 int *getConnectedNodes(int index) { return g_connectedNodes[index]; }
 
+// HELPER METHODS
+
+int getNodeByID(int id) {
+    for (int i = 0; i < g_bufSize; i++) {
+    if (g_id[i] == id) {
+        return i;
+    }
+  }
+  return -1;
+}
+
+float getLength(int nodeIndex, int connectedNodeIndex) {
+    float xdiff = fabs(g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
+    float ydiff = fabs(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex]);
+    return sqrt((xdiff * xdiff) + (ydiff * ydiff));
+}
+
+float getAngleFromHorizontal(int nodeIndex, int connectedNodeIndex) {
+    return atan2(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex], g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
+}
+
 // INPUT METHODS
 
 EMSCRIPTEN_KEEPALIVE
@@ -141,6 +161,36 @@ void getAcceleration(int nodeIndex) {
   float xSpringForce = 0;
   float xVelocityDampingForce = 0;
   float yVelocityDampingForce = 0;
+  int *connectedNodes = g_connectedNodes[nodeIndex];
+  int connectedNodesSize = g_connectedNodesSize[nodeIndex];
+  for (int i = 0; i < connectedNodesSize; i++) {
+    int connectedNodeIndex = getNodeByID(connectedNodes[i]);
+    if (connectedNodeIndex > -1) {
+        float stringLength = getLength(nodeIndex, connectedNodeIndex);
+        if (stringLength > nominalStringLength) {
+            float lengthDifference = stringLength - nominalStringLength;
+            float angleFromHorizontal = getAngleFromHorizontal(nodeIndex, connectedNodeIndex);
+            ySpringForce += sin(angleFromHorizontal) * lengthDifference * springConstant;
+            xSpringForce += cos(angleFromHorizontal) * lengthDifference * springConstant;
+        }
+        xVelocityDampingForce += internalViscousFrictionConstant * (g_velocityX[nodeIndex] - g_velocityX[connectedNodeIndex]);
+        yVelocityDampingForce += internalViscousFrictionConstant * (g_velocityY[nodeIndex] - g_velocityY[connectedNodeIndex]);
+    }
+  }
+
+  float yGravForce = 9.8 * ropeWeightPerNode;
+  float xGravForce = 0 * ropeWeightPerNode;
+  float yViscousForce = g_velocityY[nodeIndex] * viscousConstant;
+  float xViscousForce = g_velocityX[nodeIndex] * viscousConstant;
+
+  float yTotalForce = yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce; 
+  float xTotalForce = xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce; 
+
+  g_forceY[nodeIndex] = yTotalForce;
+  g_forceX[nodeIndex] = xTotalForce;
+
+  float xAcceleration = xTotalForce / ropeWeightPerNode;
+  float yAcceleration = yTotalForce / ropeWeightPerNode;
 }
 }
 
