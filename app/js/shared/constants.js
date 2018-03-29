@@ -17,7 +17,8 @@ export const ActionsEnum = Object.freeze({
     nomove:     "nomove",
     addanchor:  "addanchor",
     addnodes:   "addnodes",
-    deletenode: "deletenode"
+    deletenode: "deletenode",
+    usewasm:    "usewasm"
 })
 
 module.exports = {

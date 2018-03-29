@@ -39,7 +39,7 @@ module.exports = {
         },
         sass: {
             options: {
-                includePaths: ["node_modules/bulma"]
+                includePaths: ["node_modules/bulma","node_modules/bulma-switch/dist"]
             }
         }
     }

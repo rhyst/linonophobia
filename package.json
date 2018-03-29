@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bulma": "^0.6.2",
+    "bulma-switch": "^1.0.1",
     "preact": "^8.2.7"
   },
   "devDependencies": {

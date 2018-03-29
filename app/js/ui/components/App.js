@@ -37,7 +37,7 @@ export default class App extends Component {
 
     componentDidMount() {
         requestAnimationFrame(this.onFrame);
-        //this.state.worker.postMessage({ type: ActionsEnum.run });
+        this.state.worker.postMessage({ type: ActionsEnum.run });
     }
 
     onFrame = () => {
@@ -112,12 +112,8 @@ export default class App extends Component {
         });
     };
 
-    wasm = () => {
-        let array = this.state.nodes.map(n => n.position.x);
-        const result = ccallArrays("addNums", "number", ["array"], [array])
-        console.log(result)
-        const res = ccallArrays("doubleValues", "array", ["array"], [array], {heapIn: "HEAPF64", heapOut: "HEAPF64", returnArraySize: array.length})
-        console.log(res)    
+    setWasm = useWasm => {
+        this.state.worker.postMessage({ type: ActionsEnum.usewasm, useWasm });
     }
 
     render() {
@@ -141,7 +137,7 @@ export default class App extends Component {
                     changeOption={this.changeOption}
                     save={this.save}
                     load={() => this.setState({ loadModalVisible: true })}
-                    wasm={this.wasm}
+                    setWasm={this.setWasm}
                 />
                 <Stats
                     trueSimulationSpeed={this.state.trueSimulationSpeed}

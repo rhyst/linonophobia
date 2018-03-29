@@ -6,7 +6,8 @@ export default class Controls extends Component {
         super(props);
         this.state = {
             optionsVisible: false,
-            paused: false
+            paused: false,
+            wasm: true
         };
     }
 
@@ -93,10 +94,13 @@ export default class Controls extends Component {
                         </span>
                     </button>
                     <button
-                        class={`button is-small`}
-                        onClick={this.props.wasm}>
+                        class={`button is-small ${this.state.wasm && 'is-primary'}`}
+                        onClick={() => {
+                            this.props.setWasm(!this.state.wasm)
+                            this.setState({wasm: !this.state.wasm})
+                        }}>
                         <span class="icon">
-                            w
+                            W
                         </span>
                     </button>
                     <div

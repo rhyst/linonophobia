@@ -1,6 +1,9 @@
 #include <emscripten/emscripten.h>
 #include <stdlib.h>
 #include <cmath>
+#include <chrono>
+
+using namespace std::chrono;
 
 extern "C" {
 
@@ -31,12 +34,16 @@ int **g_connectedNodes;    // Pointer to array of connected nodes
 int *g_connectedNodesSize; // Size of connected nodes array
 int g_bufSize;
 
+//Other global vars
+double elapsedTimeAverage = 0;
+
 // INITIALISATION METHODS
 
 EMSCRIPTEN_KEEPALIVE
 int setInts(int bufSize, int *id, int idbf, int *fixed, int fbf, int *grabbed,
             int gbf, int **connectedNodes, int cnbf, int *connectedNodesSize,
-            int cnsbf) {
+            int cnsbf)
+{
   g_id = id;
   g_fixed = fixed;
   g_grabbed = grabbed;
@@ -49,7 +56,8 @@ int setInts(int bufSize, int *id, int idbf, int *fixed, int fbf, int *grabbed,
 EMSCRIPTEN_KEEPALIVE
 int setFloats(float *positionX, int pxbf, float *positionY, int pybf,
               float *velocityX, int vxbf, float *velocityY, int vybf,
-              float *forceX, int fxbf, float *forceY, int fybf) {
+              float *forceX, int fxbf, float *forceY, int fybf)
+{
   // Yes, this is horrible. It was more horrible trying to get structs to work
   g_positionX = positionX;
   g_positionY = positionY;
@@ -61,7 +69,8 @@ int setFloats(float *positionX, int pxbf, float *positionY, int pybf,
 }
 
 EMSCRIPTEN_KEEPALIVE
-int setConfig() {
+int setConfig()
+{
   metre = 10;               // pixels
   nominalStringLength = 10; // pixels
   springConstant = 25;
@@ -111,44 +120,59 @@ int *getConnectedNodesSize() { return g_connectedNodesSize; }
 EMSCRIPTEN_KEEPALIVE
 int *getConnectedNodes(int index) { return g_connectedNodes[index]; }
 
+EMSCRIPTEN_KEEPALIVE
+double getElapsedTimeAverage() { return elapsedTimeAverage; }
+
 // HELPER METHODS
 
-int getNodeByID(int id) {
-    for (int i = 0; i < g_bufSize; i++) {
-    if (g_id[i] == id) {
-        return i;
+int getNodeByID(int id)
+{
+  for (int i = 0; i < g_bufSize; i++)
+  {
+    if (g_id[i] == id)
+    {
+      return i;
     }
   }
   return -1;
 }
 
-float getLength(int nodeIndex, int connectedNodeIndex) {
-    float xdiff = fabs(g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
-    float ydiff = fabs(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex]);
-    return sqrt((xdiff * xdiff) + (ydiff * ydiff));
+float getLength(int nodeIndex, int connectedNodeIndex)
+{
+  float xdiff = fabs(g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
+  float ydiff = fabs(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex]);
+  return sqrt((xdiff * xdiff) + (ydiff * ydiff));
 }
 
-float getAngleFromHorizontal(int nodeIndex, int connectedNodeIndex) {
-    return atan2(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex], g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
+float getAngleFromHorizontal(int nodeIndex, int connectedNodeIndex)
+{
+  return atan2(g_positionY[connectedNodeIndex] - g_positionY[nodeIndex], g_positionX[connectedNodeIndex] - g_positionX[nodeIndex]);
 }
 
 // INPUT METHODS
 
 EMSCRIPTEN_KEEPALIVE
-int setPositionX(int id, float positionX) {
-  for (int i = 0; i < g_bufSize; i++) {
+int setPositionX(int id, float positionX)
+{
+  for (int i = 0; i < g_bufSize; i++)
+  {
     int testId = g_id[i];
-    if (testId == id) {
+    if (testId == id)
+    {
       g_positionX[i] = positionX;
     }
   }
   return 0;
 }
 
-int setPositionY(int id, float positionY) {
-  for (int i = 0; i < g_bufSize; i++) {
+EMSCRIPTEN_KEEPALIVE
+int setPositionY(int id, float positionY)
+{
+  for (int i = 0; i < g_bufSize; i++)
+  {
     int testId = g_id[i];
-    if (testId == id) {
+    if (testId == id)
+    {
       g_positionY[i] = positionY;
     }
   }
@@ -156,25 +180,29 @@ int setPositionY(int id, float positionY) {
 }
 
 // PHYSICS
-void getAcceleration(int nodeIndex) {
+void updateNodeForce(int nodeIndex)
+{
   float ySpringForce = 0;
   float xSpringForce = 0;
   float xVelocityDampingForce = 0;
   float yVelocityDampingForce = 0;
   int *connectedNodes = g_connectedNodes[nodeIndex];
   int connectedNodesSize = g_connectedNodesSize[nodeIndex];
-  for (int i = 0; i < connectedNodesSize; i++) {
+  for (int i = 0; i < connectedNodesSize; i++)
+  {
     int connectedNodeIndex = getNodeByID(connectedNodes[i]);
-    if (connectedNodeIndex > -1) {
-        float stringLength = getLength(nodeIndex, connectedNodeIndex);
-        if (stringLength > nominalStringLength) {
-            float lengthDifference = stringLength - nominalStringLength;
-            float angleFromHorizontal = getAngleFromHorizontal(nodeIndex, connectedNodeIndex);
-            ySpringForce += sin(angleFromHorizontal) * lengthDifference * springConstant;
-            xSpringForce += cos(angleFromHorizontal) * lengthDifference * springConstant;
-        }
-        xVelocityDampingForce += internalViscousFrictionConstant * (g_velocityX[nodeIndex] - g_velocityX[connectedNodeIndex]);
-        yVelocityDampingForce += internalViscousFrictionConstant * (g_velocityY[nodeIndex] - g_velocityY[connectedNodeIndex]);
+    if (connectedNodeIndex > -1)
+    {
+      float stringLength = getLength(nodeIndex, connectedNodeIndex);
+      if (stringLength > nominalStringLength)
+      {
+        float lengthDifference = stringLength - nominalStringLength;
+        float angleFromHorizontal = getAngleFromHorizontal(nodeIndex, connectedNodeIndex);
+        ySpringForce += sin(angleFromHorizontal) * lengthDifference * springConstant;
+        xSpringForce += cos(angleFromHorizontal) * lengthDifference * springConstant;
+      }
+      xVelocityDampingForce += internalViscousFrictionConstant * (g_velocityX[nodeIndex] - g_velocityX[connectedNodeIndex]);
+      yVelocityDampingForce += internalViscousFrictionConstant * (g_velocityY[nodeIndex] - g_velocityY[connectedNodeIndex]);
     }
   }
 
@@ -183,14 +211,50 @@ void getAcceleration(int nodeIndex) {
   float yViscousForce = g_velocityY[nodeIndex] * viscousConstant;
   float xViscousForce = g_velocityX[nodeIndex] * viscousConstant;
 
-  float yTotalForce = yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce; 
-  float xTotalForce = xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce; 
+  float yTotalForce = yGravForce + ySpringForce - yViscousForce - yVelocityDampingForce;
+  float xTotalForce = xGravForce + xSpringForce - xViscousForce - xVelocityDampingForce;
 
   g_forceY[nodeIndex] = yTotalForce;
   g_forceX[nodeIndex] = xTotalForce;
 
-  float xAcceleration = xTotalForce / ropeWeightPerNode;
-  float yAcceleration = yTotalForce / ropeWeightPerNode;
+  //float xAcceleration = xTotalForce / ropeWeightPerNode;
+  //float yAcceleration = yTotalForce / ropeWeightPerNode;
+}
+
+void updateNodeVelocity(int nodeIndex, float elapsedTime)
+{
+  g_velocityX[nodeIndex] = g_velocityX[nodeIndex] + (g_forceX[nodeIndex] * elapsedTime / ropeWeightPerNode);
+  g_velocityY[nodeIndex] = g_velocityY[nodeIndex] + (g_forceY[nodeIndex] * elapsedTime / ropeWeightPerNode);
+}
+
+void updateNodePosition(int nodeIndex, float elapsedTime)
+{
+  g_positionX[nodeIndex] = g_positionX[nodeIndex] + (g_velocityX[nodeIndex] * elapsedTime);
+  g_positionY[nodeIndex] = g_positionY[nodeIndex] + (g_velocityY[nodeIndex] * elapsedTime);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void simulate()
+{
+  auto lastTime = high_resolution_clock::now();
+  double elapsedTimeSum = 0;
+  for (int i = 0; i < 1000; i++)
+  {
+    auto newTime = high_resolution_clock::now();
+    duration<double> elapsed = duration_cast<duration<double>>(newTime - lastTime);
+    double elapsedSeconds = elapsed.count() * decltype(elapsed)::period::num / decltype(elapsed)::period::den;
+    lastTime = newTime;
+    elapsedTimeSum += elapsedSeconds;
+    for (int j = 0; j < g_bufSize; j++) {
+      if (g_fixed[j] == 0 && g_grabbed[j] == 0) {
+        updateNodeVelocity(j, elapsedSeconds/2);
+        updateNodePosition(j, elapsedSeconds);
+        updateNodeForce(j);
+        updateNodeVelocity(j, elapsedSeconds/2);
+      }
+    }
+  }
+  elapsedTimeAverage = elapsedTimeSum/1000*1000; //ms
 }
 }
 
